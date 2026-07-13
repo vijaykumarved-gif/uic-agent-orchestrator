@@ -3,358 +3,555 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UIC Agent Worklist</title>
+<title>UIC Content Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0E1418; --panel:#151D23; --panel-2:#1B252C; --line:#26333C;
-    --ink:#E2E9ED; --ink-dim:#8497A3; --ink-faint:#5B6B76;
-    --scan:#4FD6E6;            /* phosphor cyan — the scanner accent */
-    --ok:#3FB950; --warn:#D9A441; --bad:#F0553F; --idle:#5B6B76;
-    --mono:'IBM Plex Mono',ui-monospace,monospace;
-    --sans:'IBM Plex Sans',system-ui,sans-serif;
+    --bg:#F6F8FA; --card:#FFFFFF; --line:#E6EBF0; --line-2:#D7DFE7;
+    --ink:#16232E; --ink-2:#5A6B7A; --ink-3:#93A3B1;
+    --teal:#0E8C94; --teal-soft:#E4F4F5; --teal-deep:#0A6A70;
+    --ok:#1B9E55; --ok-soft:#E5F6EC;
+    --warn:#C77E14; --warn-soft:#FCF2DF;
+    --bad:#D64533; --bad-soft:#FCEAE7;
+    --run:#0E8C94;
+    --shadow:0 1px 2px rgba(22,35,46,.05),0 4px 16px rgba(22,35,46,.06);
+    --shadow-lg:0 4px 12px rgba(22,35,46,.08),0 16px 40px rgba(22,35,46,.12);
+    --sans:'Inter',system-ui,sans-serif; --disp:'Sora',var(--sans);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;
        -webkit-font-smoothing:antialiased}
 
-  header{border-bottom:1px solid var(--line);padding:14px 20px;display:flex;align-items:center;
-         gap:16px;position:sticky;top:0;background:var(--bg);z-index:10;flex-wrap:wrap}
-  .mark{font-family:var(--mono);font-weight:600;letter-spacing:.14em;font-size:12px;color:var(--scan);
-        text-transform:uppercase}
-  .mark span{color:var(--ink-faint)}
+  /* ---------- entrance animations ---------- */
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .rise{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+  /* ---------- header ---------- */
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:14px 24px;
+         display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;flex-wrap:wrap}
+  .logo{font-family:var(--disp);font-weight:700;font-size:16px;color:var(--ink);display:flex;
+        align-items:center;gap:9px}
+  .logo .dot{width:9px;height:9px;border-radius:50%;background:var(--teal);
+             box-shadow:0 0 0 4px var(--teal-soft)}
+  .logo small{font-weight:400;color:var(--ink-3);font-size:12px;font-family:var(--sans)}
   .spacer{flex:1}
 
-  button{font-family:var(--sans);font-size:13px;font-weight:600;border-radius:5px;cursor:pointer;
-         border:1px solid var(--line);background:var(--panel-2);color:var(--ink);padding:8px 14px;
-         transition:border-color .15s,background .15s}
-  button:hover{border-color:var(--scan);background:var(--panel)}
-  button:focus-visible{outline:2px solid var(--scan);outline-offset:2px}
-  button.primary{background:var(--scan);color:#06181C;border-color:var(--scan)}
-  button.primary:hover{filter:brightness(1.1)}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  button.ghost{background:transparent;color:var(--ink-dim)}
+  button{font-family:var(--sans);font-size:13.5px;font-weight:600;border-radius:9px;cursor:pointer;
+         border:1px solid var(--line-2);background:var(--card);color:var(--ink);padding:9px 16px;
+         transition:all .18s ease}
+  button:hover{border-color:var(--teal);color:var(--teal);transform:translateY(-1px)}
+  button:active{transform:none}
+  button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  button.primary{background:var(--teal);border-color:var(--teal);color:#fff;
+                 box-shadow:0 2px 8px rgba(14,140,148,.25)}
+  button.primary:hover{background:var(--teal-deep);color:#fff;box-shadow:0 4px 14px rgba(14,140,148,.35)}
+  button.ghost{border-color:transparent;color:var(--ink-2)}
+  button.ghost:hover{color:var(--teal);transform:none}
+  button:disabled{opacity:.55;cursor:not-allowed;transform:none}
 
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;
-         background:var(--line);border-bottom:1px solid var(--line)}
-  .stat{background:var(--bg);padding:14px 20px}
-  .stat .k{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-           color:var(--ink-faint)}
-  .stat .v{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:3px}
-  .stat .v.cash{color:var(--scan)}
+  main{max-width:1240px;margin:0 auto;padding:26px 24px 80px}
 
-  main{padding:20px;max-width:1500px;margin:0 auto}
+  /* ---------- stat cards ---------- */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;
+        box-shadow:var(--shadow)}
+  .stat .k{font-size:11.5px;font-weight:600;color:var(--ink-3);text-transform:uppercase;
+           letter-spacing:.05em}
+  .stat .v{font-family:var(--disp);font-size:28px;font-weight:700;margin-top:2px;
+           transition:transform .3s ease}
+  .stat .v.bump{transform:scale(1.12)}
+  .stat.teal .v{color:var(--teal)}
+  .stat.ok .v{color:var(--ok)}
+  .stat.warn .v{color:var(--warn)}
+  .stat.bad .v{color:var(--bad)}
 
-  .bar{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap}
-  h2{font-size:12px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;
-     color:var(--ink-dim);font-weight:600}
-  .hint{font-size:12px;color:var(--ink-faint)}
+  /* ---------- section ---------- */
+  .sec-head{display:flex;align-items:baseline;gap:10px;margin:0 0 14px;flex-wrap:wrap}
+  h2{font-family:var(--disp);font-size:17px;font-weight:600}
+  .sub{font-size:13px;color:var(--ink-3)}
 
-  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);
-        border-radius:6px;overflow:hidden}
-  th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-     color:var(--ink-faint);text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);
-     font-weight:500;background:var(--panel-2)}
-  td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
-  tbody tr{cursor:pointer;transition:background .12s}
-  tbody tr:hover{background:var(--panel-2)}
-  tbody tr:last-child td{border-bottom:none}
-  .id{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
-  .brand{font-weight:600}
-  .time{font-family:var(--mono);font-size:11px;color:var(--ink-dim);white-space:nowrap}
-  .cost{font-family:var(--mono);font-size:12px;color:var(--scan);text-align:right}
+  /* ---------- run cards ---------- */
+  .runs{display:flex;flex-direction:column;gap:14px}
+  .run-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;
+            box-shadow:var(--shadow);cursor:pointer;transition:box-shadow .2s ease,transform .2s ease,
+            border-color .2s ease}
+  .run-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--line-2)}
 
-  /* Signature: the stage tracker — a study moving through acquisition -> recon -> report */
-  .track{display:flex;gap:3px;align-items:center}
-  .seg{height:5px;width:34px;border-radius:2px;background:#22303A}
-  .seg.done{background:var(--ok)}
-  .seg.active{background:var(--scan);animation:pulse 1.1s ease-in-out infinite}
-  .seg.fail{background:var(--bad)}
-  .seg.review{background:var(--warn)}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-  @media (prefers-reduced-motion:reduce){.seg.active{animation:none}}
-  .track-label{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-left:6px;
-               text-transform:uppercase;letter-spacing:.06em}
+  .run-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .run-brand{font-family:var(--disp);font-weight:600;font-size:15px}
+  .run-topic{color:var(--ink-2);font-size:13.5px;flex:1;min-width:200px;overflow:hidden;
+             text-overflow:ellipsis;white-space:nowrap}
+  .run-time{font-size:12px;color:var(--ink-3);white-space:nowrap}
+  .run-cost{font-family:var(--disp);font-weight:600;font-size:13px;color:var(--teal);white-space:nowrap}
 
-  .pill{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 7px;
-        border-radius:3px;text-transform:uppercase;letter-spacing:.06em}
-  .pill.success,.pill.published{background:rgba(63,185,80,.14);color:var(--ok)}
-  .pill.failed{background:rgba(240,85,63,.14);color:var(--bad)}
-  .pill.needs_review{background:rgba(217,164,65,.14);color:var(--warn)}
-  .pill.running,.pill.pending{background:rgba(79,214,230,.14);color:var(--scan)}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+         padding:4px 11px;border-radius:99px;white-space:nowrap}
+  .badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+  .badge.success,.badge.published{background:var(--ok-soft);color:var(--ok)}
+  .badge.failed{background:var(--bad-soft);color:var(--bad)}
+  .badge.needs_review{background:var(--warn-soft);color:var(--warn)}
+  .badge.running,.badge.pending{background:var(--teal-soft);color:var(--teal)}
+  .badge.running::before{animation:blink 1s ease-in-out infinite}
+  @keyframes blink{50%{opacity:.25}}
 
-  .empty{padding:56px 20px;text-align:center;color:var(--ink-faint);background:var(--panel);
-         border:1px solid var(--line);border-radius:6px}
-  .empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:6px}
+  /* ---------- THE PROCESS RAIL (signature) ----------
+     3 steps ka journey: Research -> Create -> Publish.
+     Fill bar animate hota hai, current step pulse karta hai. */
+  .rail{display:flex;align-items:center;gap:0}
+  .step{display:flex;align-items:center;gap:9px;flex:0 0 auto}
+  .step-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+             border:2px solid var(--line-2);background:var(--card);color:var(--ink-3);
+             font-size:15px;transition:all .3s ease;position:relative;z-index:1}
+  .step-label{font-size:12.5px;font-weight:600;color:var(--ink-3);transition:color .3s ease}
+  .step-sub{font-size:11px;color:var(--ink-3);font-weight:400}
 
-  /* Drawer — the per-run agent breakdown */
-  .scrim{position:fixed;inset:0;background:rgba(4,8,10,.72);opacity:0;pointer-events:none;
-         transition:opacity .18s;z-index:20}
+  .step.done .step-icon{background:var(--ok);border-color:var(--ok);color:#fff}
+  .step.done .step-label{color:var(--ink)}
+  .step.active .step-icon{background:var(--teal);border-color:var(--teal);color:#fff;
+                          box-shadow:0 0 0 0 rgba(14,140,148,.4);animation:ring 1.6s ease-out infinite}
+  @keyframes ring{to{box-shadow:0 0 0 12px rgba(14,140,148,0)}}
+  .step.active .step-label{color:var(--teal)}
+  .step.fail .step-icon{background:var(--bad);border-color:var(--bad);color:#fff}
+  .step.fail .step-label{color:var(--bad)}
+  .step.review .step-icon{background:var(--warn);border-color:var(--warn);color:#fff}
+  .step.review .step-label{color:var(--warn)}
+
+  .conn{height:3px;flex:1;min-width:34px;background:var(--line);border-radius:2px;margin:0 10px;
+        position:relative;overflow:hidden}
+  .conn::after{content:'';position:absolute;inset:0;background:var(--ok);border-radius:2px;
+               transform:scaleX(0);transform-origin:left;transition:transform .6s cubic-bezier(.2,.7,.3,1)}
+  .conn.full::after{transform:scaleX(1)}
+  .conn.flowing::after{background:linear-gradient(90deg,var(--ok),var(--teal));transform:scaleX(1);
+        animation:flow 1.4s linear infinite;background-size:200% 100%}
+  @keyframes flow{from{background-position:100% 0}to{background-position:-100% 0}}
+
+  .run-meta{display:flex;gap:16px;margin-top:13px;font-size:12.5px;color:var(--ink-2);flex-wrap:wrap}
+  .run-meta b{color:var(--ink)}
+  .run-meta .fail-note{color:var(--bad);font-weight:600}
+
+  .empty{padding:70px 24px;text-align:center;background:var(--card);border:1px dashed var(--line-2);
+         border-radius:16px;color:var(--ink-3)}
+  .empty b{display:block;color:var(--ink);font-family:var(--disp);font-size:17px;margin-bottom:6px}
+
+  /* ---------- drawer ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(22,35,46,.32);backdrop-filter:blur(2px);
+         opacity:0;pointer-events:none;transition:opacity .22s;z-index:20}
   .scrim.open{opacity:1;pointer-events:auto}
-  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(620px,100%);background:var(--bg);
-          border-left:1px solid var(--line);transform:translateX(100%);transition:transform .22s ease;
-          z-index:21;overflow-y:auto}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100%);background:var(--bg);
+          transform:translateX(102%);transition:transform .28s cubic-bezier(.2,.7,.3,1);
+          z-index:21;overflow-y:auto;box-shadow:-12px 0 44px rgba(22,35,46,.14)}
   .drawer.open{transform:none}
-  @media (prefers-reduced-motion:reduce){.drawer,.scrim{transition:none}}
-  .dhead{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;
-         gap:12px;position:sticky;top:0;background:var(--bg)}
-  .dhead h3{font-size:15px;flex:1}
-  .dbody{padding:20px}
-  .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;font-size:13px;margin-bottom:20px}
-  .kv dt{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-         color:var(--ink-faint);padding-top:3px}
+  .dhead{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;
+         gap:12px;position:sticky;top:0;background:var(--card);z-index:2}
+  .dhead h3{font-family:var(--disp);font-size:16px;font-weight:600;flex:1}
+  .dbody{padding:24px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;
+        margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h4{font-family:var(--disp);font-size:13px;font-weight:600;color:var(--ink-2);
+           text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+
+  .kv{display:grid;grid-template-columns:110px 1fr;gap:8px 14px;font-size:13.5px}
+  .kv dt{color:var(--ink-3);font-weight:500}
   .kv dd{word-break:break-word}
-  .kv dd a{color:var(--scan)}
 
-  .arow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);
-        font-size:13px}
-  .arow:last-child{border-bottom:none}
-  .aname{font-family:var(--mono);font-size:12px;flex:1}
-  .adur{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
-  .acost{font-family:var(--mono);font-size:11px;color:var(--scan);min-width:52px;text-align:right}
-  .aerr{font-family:var(--mono);font-size:11px;color:var(--bad);padding:6px 10px;margin:2px 0 8px;
-        background:rgba(240,85,63,.07);border-left:2px solid var(--bad);border-radius:0 3px 3px 0;
-        white-space:pre-wrap;word-break:break-word}
+  .caption-box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+               font-size:13px;white-space:pre-wrap;line-height:1.6;max-height:180px;overflow-y:auto}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .tag{background:var(--teal-soft);color:var(--teal-deep);font-size:12px;font-weight:500;
+       padding:3px 10px;border-radius:99px}
 
-  .asset{display:block;margin:6px 0;font-family:var(--mono);font-size:11px;color:var(--scan);
-         word-break:break-all}
-  .thumb{max-width:150px;border-radius:5px;border:1px solid var(--line);margin-top:6px;display:block}
+  .score-wrap{display:flex;align-items:center;gap:12px}
+  .score-bar{flex:1;height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+  .score-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--warn),var(--ok));
+              transform-origin:left;animation:grow .8s cubic-bezier(.2,.7,.3,1) both}
+  @keyframes grow{from{transform:scaleX(0)}}
+  .score-num{font-family:var(--disp);font-weight:700;font-size:16px}
 
-  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
-         background:var(--panel-2);border:1px solid var(--line);padding:11px 18px;border-radius:6px;
-         font-size:13px;transition:transform .2s;z-index:30;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  .thumb{width:100%;max-width:220px;border-radius:12px;border:1px solid var(--line);display:block;
+         box-shadow:var(--shadow)}
+  .asset-link{display:inline-flex;align-items:center;gap:7px;color:var(--teal);font-weight:600;
+              font-size:13px;text-decoration:none;margin:4px 14px 4px 0}
+  .asset-link:hover{text-decoration:underline}
+
+  /* agent timeline */
+  .tl{position:relative;padding-left:26px}
+  .tl::before{content:'';position:absolute;left:9px;top:8px;bottom:8px;width:2px;background:var(--line)}
+  .tl-item{position:relative;padding:8px 0;display:flex;align-items:center;gap:10px;
+           animation:rise .4s ease both}
+  .tl-item .node{position:absolute;left:-26px;top:50%;transform:translateY(-50%);width:20px;height:20px;
+                 border-radius:50%;display:grid;place-items:center;font-size:11px;color:#fff;
+                 background:var(--ink-3)}
+  .tl-item.success .node{background:var(--ok)}
+  .tl-item.failed .node{background:var(--bad)}
+  .tl-item.needs_review .node{background:var(--warn)}
+  .tl-name{font-weight:600;font-size:13.5px;flex:1}
+  .tl-desc{font-size:12px;color:var(--ink-3)}
+  .tl-time{font-size:12px;color:var(--ink-3);white-space:nowrap}
+  .tl-cost{font-family:var(--disp);font-size:12px;font-weight:600;color:var(--teal);min-width:52px;
+           text-align:right}
+  .tl-err{margin:2px 0 8px;padding:10px 13px;background:var(--bad-soft);color:#8C2C1F;
+          border-radius:9px;font-size:12.5px;line-height:1.5;word-break:break-word}
+  .tl-err b{display:block;color:var(--bad);margin-bottom:3px;font-size:12px}
+
+  .pub-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);
+           font-size:13.5px}
+  .pub-row:last-child{border-bottom:none}
+  .pub-row .plat{font-weight:600;flex:1;text-transform:capitalize}
+
+  /* toast */
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(90px);
+         background:var(--ink);color:#fff;padding:12px 20px;border-radius:12px;font-size:13.5px;
+         font-weight:500;transition:transform .25s cubic-bezier(.2,.7,.3,1);z-index:30;
+         box-shadow:var(--shadow-lg)}
   .toast.show{transform:translateX(-50%)}
-  .toast.err{border-color:var(--bad);color:var(--bad)}
-  .toast.ok{border-color:var(--ok)}
+  .toast.err{background:var(--bad)}
+  .toast.ok{background:var(--ok)}
+
+  /* run modal */
+  .modal-scrim{position:fixed;inset:0;background:rgba(22,35,46,.32);backdrop-filter:blur(2px);
+               display:none;place-items:center;z-index:25;padding:20px}
+  .modal-scrim.open{display:grid;animation:fadeIn .18s ease}
+  .modal{background:var(--card);border-radius:18px;box-shadow:var(--shadow-lg);width:100%;
+         max-width:420px;padding:26px;animation:rise .28s cubic-bezier(.2,.7,.3,1)}
+  .modal h3{font-family:var(--disp);font-size:17px;margin-bottom:4px}
+  .modal p{color:var(--ink-3);font-size:13px;margin-bottom:18px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+  .field input,.field select{width:100%;border:1px solid var(--line-2);border-radius:10px;
+        padding:10px 12px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--card)}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--teal);
+        box-shadow:0 0 0 3px var(--teal-soft)}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+
+  @media (max-width:640px){
+    .step-label-wrap{display:none}
+    .run-topic{white-space:normal}
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="mark">UIC <span>/</span> Agent Worklist</div>
+<header class="rise">
+  <div class="logo"><span class="dot"></span>UIC Content Studio <small>AI agents for growth</small></div>
   <div class="spacer"></div>
-  <button id="refresh" class="ghost">Refresh</button>
-  <button id="run" class="primary">Run pipeline</button>
+  <button id="refresh" class="ghost">↻ Refresh</button>
+  <button id="runBtn" class="primary">+ New post</button>
   <button id="logout" class="ghost">Sign out</button>
 </header>
 
-<div class="stats" id="stats"></div>
-
 <main>
-  <div class="bar">
-    <h2>Runs</h2>
-    <span class="hint">Select a run to see every agent, its cost, and any failure.</span>
+  <div class="stats" id="stats"></div>
+
+  <div class="sec-head rise" style="animation-delay:.08s">
+    <h2>Content runs</h2>
+    <span class="sub">Har run = ek post banne ka poora safar. Card par click karke detail dekho.</span>
   </div>
-  <div id="table"></div>
+  <div class="runs" id="runs"></div>
 </main>
 
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" aria-label="Run detail">
   <div class="dhead">
-    <h3 id="dtitle">Run</h3>
-    <button id="dclose" class="ghost">Close</button>
+    <h3 id="dtitle">Run detail</h3>
+    <button id="dclose" class="ghost">✕ Close</button>
   </div>
   <div class="dbody" id="dbody"></div>
 </aside>
 
+<div class="modal-scrim" id="modalScrim">
+  <div class="modal">
+    <h3>Naya post banao</h3>
+    <p>Agents research karenge, content banayenge, aur publish karenge. 2–5 minute lagte hain.</p>
+    <div class="field">
+      <label for="mBrand">Brand</label>
+      <select id="mBrand">
+        <option value="usmanpura_imaging">Usmanpura Imaging</option>
+        <option value="pixel_diagnostics">Pixel Diagnostics</option>
+        <option value="airmed_patholab">Airmed Patholab</option>
+        <option value="urja_diagnostics">Urja Diagnostics</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="mTopic">Topic <span style="font-weight:400;color:var(--ink-3)">(khaali chhodo — Trend Agent khud dhundh lega)</span></label>
+      <input id="mTopic" placeholder="e.g. MRI myths, dengue testing…">
+    </div>
+    <div class="modal-actions">
+      <button id="mCancel">Cancel</button>
+      <button id="mGo" class="primary">Start</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-const STAGES = ['intelligence','creation','distribution'];
+/* Agent ke naam simple bhasha me — dashboard dekhne wale ko turant samajh aaye */
+const AGENT_INFO = {
+  trend_agent:            ['Trend research',      'Aaj kya relevant hai, web se dhundta hai'],
+  competitor_agent:       ['Competitor check',    'Competitors kya post kar rahe hain'],
+  script_agent:           ['Script writing',      'Reel ka script likhta hai'],
+  caption_agent:          ['Caption',             'Post ka caption likhta hai'],
+  hashtag_agent:          ['Hashtags',            'Sahi hashtags chunta hai'],
+  image_agent:            ['Image banana',        'AI se post ki image banata hai'],
+  thumbnail_agent:        ['Thumbnail',           'Reel ka cover image'],
+  voice_agent:            ['Voiceover',           'Script ko awaaz deta hai'],
+  subtitle_agent:         ['Subtitles',           'Video ke captions banata hai'],
+  video_agent:            ['Video banana',        'Image + voice + subtitles = reel'],
+  viral_prediction_agent: ['Quality score',       'Post kitna chalega, score deta hai'],
+  instagram_publisher:    ['Instagram post',      'Instagram par publish karta hai'],
+  facebook_publisher:     ['Facebook post',       'Facebook par publish karta hai'],
+  youtube_shorts_publisher:['YouTube Short',      'YouTube par publish karta hai'],
+  linkedin_publisher:     ['LinkedIn post',       'LinkedIn par publish karta hai'],
+  lead_qualification_agent:['Lead check',         'Comment/DM lead hai ya nahi'],
+  crm_agent:              ['CRM entry',           'Lead ko CRM me save karta hai'],
+  whatsapp_agent:         ['WhatsApp follow-up',  'Lead ko WhatsApp bhejta hai'],
+  analytics_agent:        ['Analytics',           'Posts ki performance uthata hai'],
+  revenue_optimization_agent:['Revenue analysis', 'Kya kaam kar raha hai, batata hai'],
+};
 
-function toast(msg, kind){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + (kind || '');
-  setTimeout(()=>{ t.className = 'toast ' + (kind||''); }, 3800);
-}
+const STAGE_STEPS = [
+  { key:'intelligence', label:'Research',  sub:'Trend + competitor', icon:'🔍' },
+  { key:'creation',     label:'Create',    sub:'Script, image, video', icon:'✨' },
+  { key:'distribution', label:'Publish',   sub:'Social platforms', icon:'🚀' },
+];
 
-function esc(s){
-  return String(s==null?'':s).replace(/[&<>"']/g, c => (
-    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
-  ));
-}
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function ago(ts){
-  const s = Math.floor((Date.now() - new Date(ts)) / 1000);
-  if (s < 60) return s + 's ago';
-  if (s < 3600) return Math.floor(s/60) + 'm ago';
-  if (s < 86400) return Math.floor(s/3600) + 'h ago';
-  return Math.floor(s/86400) + 'd ago';
+  const s = Math.floor((Date.now()-new Date(ts))/1000);
+  if (s<60) return 'abhi ' + s + 's pehle';
+  if (s<3600) return Math.floor(s/60)+' min pehle';
+  if (s<86400) return Math.floor(s/3600)+' ghante pehle';
+  return Math.floor(s/86400)+' din pehle';
 }
 
-// The stage tracker: which of the 3 stages this run has cleared.
-function track(run){
-  const cur = STAGES.indexOf(run.stage);
-  const done = run.stage === 'done';
-  const failed = run.status === 'failed';
-  const review = run.status === 'needs_review';
-
-  const segs = STAGES.map((_, i) => {
-    if (done) return 'done';
-    if (i < cur) return 'done';
-    if (i === cur) return failed ? 'fail' : review ? 'review' : 'active';
-    return '';
-  }).map(c => '<div class="seg ' + c + '"></div>').join('');
-
-  const label = done ? 'complete' : failed ? (run.stage + ' failed') : run.stage;
-  return '<div class="track">' + segs + '<span class="track-label">' + esc(label) + '</span></div>';
+function toast(msg,kind){
+  const t=$('toast'); t.textContent=msg; t.className='toast show '+(kind||'');
+  setTimeout(()=>t.className='toast '+(kind||''),4000);
 }
 
-async function load(){
-  const [statsRes, runsRes] = await Promise.all([
-    fetch('/api/stats'), fetch('/api/runs')
-  ]);
-  if (statsRes.status === 401) { location.href = '/login'; return; }
+function statusLabel(s){
+  return {success:'Complete',published:'Published',failed:'Failed',
+          needs_review:'Review chahiye',running:'Chal raha hai',pending:'Queue me'}[s]||s;
+}
 
-  const stats = await statsRes.json();
-  const runs = await runsRes.json();
+/* ---------- process rail ---------- */
+function rail(run){
+  const idx = STAGE_STEPS.findIndex(s=>s.key===run.stage);
+  const done = run.stage==='done';
+  const failed = run.status==='failed';
+  const review = run.status==='needs_review';
 
-  document.getElementById('stats').innerHTML = [
-    ['Runs', stats.total_runs],
-    ['Published', stats.published],
-    ['Needs review', stats.needs_review],
-    ['Failed', stats.failed],
-    ['Leads', stats.leads],
-    ['Spend', '$' + Number(stats.total_cost || 0).toFixed(2), 'cash']
-  ].map(([k,v,cls]) =>
-    '<div class="stat"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div></div>'
-  ).join('');
+  let html = '<div class="rail">';
+  STAGE_STEPS.forEach((s,i)=>{
+    let cls='', icon=s.icon;
+    if (done || i<idx){ cls='done'; icon='✓'; }
+    else if (i===idx){
+      cls = failed?'fail':review?'review':'active';
+      icon = failed?'✕':review?'!':s.icon;
+    }
+    html += '<div class="step '+cls+'">'+
+      '<div class="step-icon">'+icon+'</div>'+
+      '<div class="step-label-wrap"><div class="step-label">'+s.label+'</div>'+
+      '<div class="step-sub">'+s.sub+'</div></div></div>';
+    if (i<STAGE_STEPS.length-1){
+      const connCls = (done||i<idx)?'full':(i===idx && !failed && !review)?'flowing':'';
+      html += '<div class="conn '+connCls+'"></div>';
+    }
+  });
+  return html+'</div>';
+}
 
-  const el = document.getElementById('table');
+/* ---------- stats ---------- */
+let lastStats={};
+async function loadStats(){
+  const r = await fetch('/api/stats');
+  if (r.status===401){location.href='/login';return}
+  const s = await r.json();
+  const items=[
+    ['Total runs',s.total_runs,''],['Published',s.published,'ok'],
+    ['Review chahiye',s.needs_review,'warn'],['Failed',s.failed,'bad'],
+    ['Leads',s.leads,''],['Kharcha',(s.total_cost!=null?'$'+Number(s.total_cost).toFixed(2):'—'),'teal'],
+  ];
+  $('stats').innerHTML = items.map(([k,v,cls],i)=>
+    '<div class="stat '+cls+' rise" style="animation-delay:'+(i*0.05)+'s">'+
+    '<div class="k">'+k+'</div><div class="v" data-k="'+k+'">'+v+'</div></div>').join('');
+  // bump animation on change
+  items.forEach(([k,v])=>{
+    if (lastStats[k]!==undefined && lastStats[k]!==v){
+      const el=document.querySelector('.v[data-k="'+k+'"]');
+      if (el){el.classList.add('bump');setTimeout(()=>el.classList.remove('bump'),350)}
+    }
+    lastStats[k]=v;
+  });
+}
+
+/* ---------- runs ---------- */
+async function loadRuns(){
+  const r = await fetch('/api/runs');
+  if (r.status===401){location.href='/login';return}
+  const runs = await r.json();
+  const el = $('runs');
+
   if (!runs.length){
-    el.innerHTML = '<div class="empty"><b>No runs yet</b>Hit “Run pipeline” to generate and publish your first post.</div>';
+    el.innerHTML = '<div class="empty rise"><b>Abhi koi run nahi hai</b>'+
+      '"New post" dabao — agents research se lekar publish tak sab kar denge.</div>';
     return;
   }
 
-  el.innerHTML = '<table><thead><tr>' +
-    '<th>Brand</th><th>Topic</th><th>Progress</th><th>Status</th>' +
-    '<th>Agents</th><th style="text-align:right">Cost</th><th>Started</th>' +
-    '</tr></thead><tbody>' +
-    runs.map(r => {
-      const topic = (r.script && r.script.hook) || (r.trend_source && r.trend_source.trends
-        && r.trend_source.trends[0] && r.trend_source.trends[0].topic) || '—';
-      return '<tr data-id="'+r.id+'">' +
-        '<td class="brand">'+esc(r.brand)+'<div class="id">'+r.id.slice(0,8)+'</div></td>' +
-        '<td>'+esc(topic.slice(0,58))+'</td>' +
-        '<td>'+track(r)+'</td>' +
-        '<td><span class="pill '+esc(r.status)+'">'+esc(r.status)+'</span></td>' +
-        '<td class="id">'+(r.ok_agents||0)+'/'+(r.total_agents||0)+
-          (r.failed_agents > 0 ? ' <span style="color:var(--bad)">·'+r.failed_agents+' failed</span>' : '') + '</td>' +
-        '<td class="cost">$'+Number(r.cost||0).toFixed(3)+'</td>' +
-        '<td class="time">'+ago(r.created_at)+'</td>' +
-      '</tr>';
-    }).join('') + '</tbody></table>';
-
-  el.querySelectorAll('tr[data-id]').forEach(tr =>
-    tr.addEventListener('click', () => openRun(tr.dataset.id))
-  );
-}
-
-async function openRun(id){
-  const res = await fetch('/api/runs/' + id);
-  if (!res.ok) return toast('Could not load that run', 'err');
-  const d = await res.json();
-
-  document.getElementById('dtitle').textContent = d.run.brand;
-
-  const a = d.run.assets || {};
-  const img = a.image_agent && a.image_agent.image_urls && a.image_agent.image_urls[0];
-  const vid = a.video_agent && a.video_agent.video_url;
-  const aud = a.voice_agent && a.voice_agent.audio_url;
-
-  let html = '<dl class="kv">' +
-    '<dt>Run</dt><dd class="id">'+d.run.id+'</dd>' +
-    '<dt>Stage</dt><dd><span class="pill '+esc(d.run.status)+'">'+esc(d.run.stage)+' · '+esc(d.run.status)+'</span></dd>' +
-    '<dt>Started</dt><dd>'+new Date(d.run.created_at).toLocaleString()+'</dd>';
-
-  if (d.run.script) {
-    html += '<dt>Hook</dt><dd>'+esc(d.run.script.hook || '—')+'</dd>';
-    if (d.run.script.cta) html += '<dt>CTA</dt><dd>'+esc(d.run.script.cta)+'</dd>';
-  }
-  if (a.caption_agent && a.caption_agent.caption)
-    html += '<dt>Caption</dt><dd>'+esc(a.caption_agent.caption)+'</dd>';
-  if (a.hashtag_agent && a.hashtag_agent.hashtags)
-    html += '<dt>Hashtags</dt><dd class="id">'+esc(a.hashtag_agent.hashtags.join(' '))+'</dd>';
-  if (a.viral_prediction_agent && a.viral_prediction_agent.predicted_score != null)
-    html += '<dt>Viral score</dt><dd>'+a.viral_prediction_agent.predicted_score+'</dd>';
-  html += '</dl>';
-
-  if (img || vid || aud) {
-    html += '<h2 style="margin:0 0 8px">Assets</h2>';
-    if (img) html += '<img class="thumb" src="'+esc(img)+'" alt="Generated image">';
-    if (vid) html += '<a class="asset" href="'+esc(vid)+'" target="_blank" rel="noopener">▸ video.mp4</a>';
-    if (aud) html += '<a class="asset" href="'+esc(aud)+'" target="_blank" rel="noopener">▸ voiceover.mp3</a>';
-    html += '<div style="height:20px"></div>';
-  }
-
-  if (d.posts && d.posts.length) {
-    html += '<h2 style="margin:0 0 8px">Published</h2>';
-    d.posts.forEach(p => {
-      const link = p.metrics && p.metrics.permalink;
-      html += '<div class="arow"><span class="aname">'+esc(p.platform)+'</span>' +
-        (link ? '<a class="asset" href="'+esc(link)+'" target="_blank" rel="noopener">open post ↗</a>'
-              : '<span class="id">'+esc(p.external_post_id||'')+'</span>') + '</div>';
-    });
-    html += '<div style="height:20px"></div>';
-  }
-
-  html += '<h2 style="margin:0 0 8px">Agents</h2>';
-  html += d.agents.map(ag => {
-    let row = '<div class="arow">' +
-      '<span class="pill '+esc(ag.status)+'">'+(ag.status==='success'?'ok':esc(ag.status))+'</span>' +
-      '<span class="aname">'+esc(ag.agent_name)+'</span>' +
-      '<span class="adur">'+(ag.duration_ms||0)+'ms</span>' +
-      '<span class="acost">$'+Number(ag.cost_usd||0).toFixed(3)+'</span>' +
-    '</div>';
-    if (ag.error) row += '<div class="aerr">'+esc(ag.error)+'</div>';
-    return row;
+  el.innerHTML = runs.map((run,i)=>{
+    const topic = (run.script&&run.script.hook) ||
+      (run.trend_source&&run.trend_source.trends&&run.trend_source.trends[0]&&run.trend_source.trends[0].topic) || '';
+    const failNote = run.failed_agents>0
+      ? '<span class="fail-note">'+run.failed_agents+' step fail — click karke dekho</span>' : '';
+    return '<div class="run-card rise" style="animation-delay:'+(Math.min(i,6)*0.06)+'s" data-id="'+run.id+'">'+
+      '<div class="run-top">'+
+        '<span class="run-brand">'+esc(run.brand.replace(/_/g,' '))+'</span>'+
+        '<span class="badge '+esc(run.status)+'">'+statusLabel(run.status)+'</span>'+
+        '<span class="run-topic">'+esc(topic)+'</span>'+
+        '<span class="run-cost">$'+Number(run.cost||0).toFixed(3)+'</span>'+
+        '<span class="run-time">'+ago(run.created_at)+'</span>'+
+      '</div>'+
+      rail(run)+
+      '<div class="run-meta"><span><b>'+(run.ok_agents||0)+'</b> / '+(run.total_agents||0)+
+      ' steps complete</span>'+failNote+'</div></div>';
   }).join('');
 
-  document.getElementById('dbody').innerHTML = html;
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('scrim').classList.add('open');
+  el.querySelectorAll('.run-card').forEach(c=>
+    c.addEventListener('click',()=>openRun(c.dataset.id)));
 }
 
-function closeDrawer(){
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('scrim').classList.remove('open');
-}
-document.getElementById('dclose').onclick = closeDrawer;
-document.getElementById('scrim').onclick = closeDrawer;
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+/* ---------- drawer ---------- */
+async function openRun(id){
+  const r = await fetch('/api/runs/'+id);
+  if (!r.ok) return toast('Run load nahi hua','err');
+  const d = await r.json();
+  const run=d.run, a=run.assets||{};
 
-document.getElementById('refresh').onclick = () => load();
+  $('dtitle').textContent = run.brand.replace(/_/g,' ');
 
-document.getElementById('run').onclick = async () => {
-  const brand = prompt('Brand', 'usmanpura_imaging');
-  if (!brand) return;
-  const btn = document.getElementById('run');
-  btn.disabled = true; btn.textContent = 'Starting…';
-  try {
-    const r = await fetch('/pipeline/run', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ brand, platforms:['instagram'] })
-    });
-    if (!r.ok) throw new Error((await r.json()).error || 'Failed to start');
-    toast('Pipeline started — this takes a few minutes', 'ok');
-    setTimeout(load, 1500);
-  } catch (e) {
-    toast(e.message, 'err');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Run pipeline';
+  let html = '<div class="card"><h4>Status</h4>'+rail(run)+
+    '<div class="kv" style="margin-top:16px">'+
+    '<dt>Status</dt><dd><span class="badge '+esc(run.status)+'">'+statusLabel(run.status)+'</span></dd>'+
+    '<dt>Shuru hua</dt><dd>'+new Date(run.created_at).toLocaleString('en-IN')+'</dd>'+
+    '<dt>Run ID</dt><dd style="color:var(--ink-3);font-size:12px">'+run.id+'</dd></div></div>';
+
+  if (run.script){
+    html += '<div class="card"><h4>Content</h4><div class="kv">'+
+      '<dt>Hook</dt><dd><b>'+esc(run.script.hook||'—')+'</b></dd>'+
+      (run.script.cta?'<dt>CTA</dt><dd>'+esc(run.script.cta)+'</dd>':'')+'</div>';
+    if (a.caption_agent&&a.caption_agent.caption)
+      html += '<div style="margin-top:12px"><div class="kv"><dt>Caption</dt><dd></dd></div>'+
+        '<div class="caption-box">'+esc(a.caption_agent.caption)+'</div></div>';
+    if (a.hashtag_agent&&a.hashtag_agent.hashtags&&a.hashtag_agent.hashtags.length)
+      html += '<div class="tags">'+a.hashtag_agent.hashtags.map(h=>'<span class="tag">'+esc(h)+'</span>').join('')+'</div>';
+    html += '</div>';
   }
+
+  if (a.viral_prediction_agent&&a.viral_prediction_agent.predicted_score!=null){
+    const sc=a.viral_prediction_agent.predicted_score;
+    html += '<div class="card"><h4>Quality score</h4><div class="score-wrap">'+
+      '<div class="score-bar"><div class="score-fill" style="width:'+(sc*100)+'%"></div></div>'+
+      '<span class="score-num">'+(sc*10).toFixed(1)+'/10</span></div>'+
+      (a.viral_prediction_agent.reasoning?'<p style="margin-top:10px;font-size:13px;color:var(--ink-2)">'+
+        esc(a.viral_prediction_agent.reasoning)+'</p>':'')+'</div>';
+  }
+
+  const img=a.image_agent&&a.image_agent.image_urls&&a.image_agent.image_urls[0];
+  const vid=a.video_agent&&a.video_agent.video_url;
+  const aud=a.voice_agent&&a.voice_agent.audio_url;
+  if (img||vid||aud){
+    html += '<div class="card"><h4>Bane hue assets</h4>';
+    if (img) html += '<img class="thumb" src="'+esc(img)+'" alt="Generated image" loading="lazy">';
+    html += '<div style="margin-top:10px">';
+    if (vid) html += '<a class="asset-link" href="'+esc(vid)+'" target="_blank" rel="noopener">▶ Video dekho</a>';
+    if (aud) html += '<a class="asset-link" href="'+esc(aud)+'" target="_blank" rel="noopener">♪ Voiceover suno</a>';
+    html += '</div></div>';
+  }
+
+  if (d.posts&&d.posts.length){
+    html += '<div class="card"><h4>Publish hua</h4>';
+    d.posts.forEach(p=>{
+      const link=p.metrics&&p.metrics.permalink;
+      html += '<div class="pub-row"><span class="plat">'+esc(p.platform.replace(/_/g,' '))+'</span>'+
+        (link?'<a class="asset-link" href="'+esc(link)+'" target="_blank" rel="noopener">Post kholo ↗</a>'
+             :'<span style="color:var(--ink-3);font-size:12px">'+esc(p.external_post_id||'')+'</span>')+'</div>';
+    });
+    html += '</div>';
+  }
+
+  html += '<div class="card"><h4>Steps — kya hua, step by step</h4><div class="tl">';
+  html += d.agents.map((ag,i)=>{
+    const info = AGENT_INFO[ag.agent_name]||[ag.agent_name,''];
+    const icon = ag.status==='success'?'✓':ag.status==='failed'?'✕':'!';
+    let row = '<div class="tl-item '+esc(ag.status)+'" style="animation-delay:'+(i*0.045)+'s">'+
+      '<span class="node">'+icon+'</span>'+
+      '<div style="flex:1"><div class="tl-name">'+esc(info[0])+'</div>'+
+      '<div class="tl-desc">'+esc(info[1])+'</div></div>'+
+      '<span class="tl-time">'+((ag.duration_ms||0)/1000).toFixed(1)+'s</span>'+
+      '<span class="tl-cost">$'+Number(ag.cost_usd||0).toFixed(3)+'</span></div>';
+    if (ag.error) row += '<div class="tl-err"><b>Kya problem aayi:</b>'+esc(friendlyError(ag.error))+'</div>';
+    return row;
+  }).join('');
+  html += '</div></div>';
+
+  $('dbody').innerHTML=html;
+  $('drawer').classList.add('open');
+  $('scrim').classList.add('open');
+}
+
+/* Errors ko simple bhasha me translate karo jahan pattern pehchana ja sake */
+function friendlyError(err){
+  if (/billing.hard.limit|billing_limit/i.test(err))
+    return 'OpenAI ka billing limit khatam ho gaya. platform.openai.com → Settings → Limits me limit badhao. ('+err.slice(0,120)+'…)';
+  if (/not set/i.test(err))
+    return err+' — Render ke Environment me ye key add karo.';
+  if (/401|invalid.*key|authentication/i.test(err))
+    return 'API key galat ya expire hai. Render Environment me check karo. ('+err.slice(0,120)+'…)';
+  if (/429|rate.limit|quota/i.test(err))
+    return 'API ki limit hit ho gayi — thodi der baad try karo. ('+err.slice(0,100)+'…)';
+  return err;
+}
+
+function closeDrawer(){$('drawer').classList.remove('open');$('scrim').classList.remove('open')}
+$('dclose').onclick=closeDrawer;
+$('scrim').onclick=closeDrawer;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();$('modalScrim').classList.remove('open')}});
+
+/* ---------- new post modal ---------- */
+$('runBtn').onclick=()=>$('modalScrim').classList.add('open');
+$('mCancel').onclick=()=>$('modalScrim').classList.remove('open');
+$('modalScrim').addEventListener('click',e=>{if(e.target===$('modalScrim'))$('modalScrim').classList.remove('open')});
+
+$('mGo').onclick=async()=>{
+  const btn=$('mGo'); btn.disabled=true; btn.textContent='Starting…';
+  try{
+    const body={brand:$('mBrand').value,platforms:['instagram']};
+    const topic=$('mTopic').value.trim();
+    if (topic) body.topic=topic;
+    const r=await fetch('/pipeline/run',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok) throw new Error((await r.json()).error||'Start nahi hua');
+    $('modalScrim').classList.remove('open');
+    toast('Pipeline shuru! 2–5 min lagenge — board khud update hoga.','ok');
+    setTimeout(loadAll,1200);
+  }catch(e){toast(e.message,'err')}
+  finally{btn.disabled=false;btn.textContent='Start'}
 };
 
-document.getElementById('logout').onclick = async () => {
-  await fetch('/logout', { method:'POST' });
-  location.href = '/login';
-};
+$('refresh').onclick=loadAll;
+$('logout').onclick=async()=>{await fetch('/logout',{method:'POST'});location.href='/login'};
 
-load();
-setInterval(load, 10000); // runs take minutes; a 10s poll keeps the board honest
+function loadAll(){loadStats();loadRuns()}
+loadAll();
+setInterval(loadAll,8000);
 </script>
 </body>
 </html>
