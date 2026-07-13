@@ -1,59 +1,125 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const { runContentPipeline } = require('./orchestrator/contentPipeline');
 const { handleEngagementEvent } = require('./orchestrator/engagementWorkflow');
+const { requireAuth, handleLogin, handleLogout } = require('./orchestrator/auth');
+const { query } = require('./db/db');
 
 const app = express();
 app.use(express.json());
 
-/**
- * Kick off a full content pipeline run.
- * Body: { brand: 'usmanpura_imaging', topic?: string, platforms: ['instagram','facebook'] }
- *
- * Fire-and-check pattern: returns immediately with pipelineRunId; poll
- * GET /pipeline/:id for status, or check WhatsApp/dashboard once "done".
- */
-app.post('/pipeline/run', async (req, res) => {
+// Auth gate. Everything below this line requires a session except /health,
+// /login, and the login page itself (handled inside requireAuth).
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.post('/login', handleLogin);
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.use(requireAuth);
+app.post('/logout', handleLogout);
+
+// Dashboard
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ---------------- Dashboard API ----------------
+
+app.get('/api/stats', async (req, res, next) => {
   try {
-    const { brand, topic, region, platforms, format } = req.body;
+    const runs = await query(`
+      SELECT
+        COUNT(*)                                          AS total_runs,
+        COUNT(*) FILTER (WHERE stage = 'done')            AS published,
+        COUNT(*) FILTER (WHERE status = 'needs_review')   AS needs_review,
+        COUNT(*) FILTER (WHERE status = 'failed')         AS failed
+      FROM content_pipeline_runs`);
+    const cost = await query(`SELECT COALESCE(SUM(cost_usd),0) AS total_cost FROM agent_runs`);
+    const leads = await query(`SELECT COUNT(*) AS leads FROM leads`);
+
+    res.json({ ...runs.rows[0], ...cost.rows[0], ...leads.rows[0] });
+  } catch (err) { next(err); }
+});
+
+app.get('/api/runs', async (req, res, next) => {
+  try {
+    // One query, with the per-run agent tallies rolled up — the dashboard needs
+    // cost + pass/fail counts per row, and N+1 queries would be silly here.
+    const { rows } = await query(`
+      SELECT
+        cpr.id, cpr.brand, cpr.stage, cpr.status, cpr.script, cpr.trend_source, cpr.created_at,
+        COALESCE(SUM(ar.cost_usd), 0)                             AS cost,
+        COUNT(ar.id)                                              AS total_agents,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'success')         AS ok_agents,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'failed')          AS failed_agents
+      FROM content_pipeline_runs cpr
+      LEFT JOIN agent_runs ar ON ar.pipeline_run_id = cpr.id
+      GROUP BY cpr.id
+      ORDER BY cpr.created_at DESC
+      LIMIT 50`);
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+app.get('/api/runs/:id', async (req, res, next) => {
+  try {
+    const run = await query(`SELECT * FROM content_pipeline_runs WHERE id = $1`, [req.params.id]);
+    if (!run.rows.length) return res.status(404).json({ error: 'Run not found' });
+
+    const agents = await query(
+      `SELECT agent_name, status, confidence, cost_usd, duration_ms, error, created_at
+       FROM agent_runs WHERE pipeline_run_id = $1 ORDER BY created_at`,
+      [req.params.id]
+    );
+    const posts = await query(
+      `SELECT platform, external_post_id, published_at, metrics
+       FROM published_posts WHERE pipeline_run_id = $1`,
+      [req.params.id]
+    );
+
+    res.json({ run: run.rows[0], agents: agents.rows, posts: posts.rows });
+  } catch (err) { next(err); }
+});
+
+// ---------------- Pipeline ----------------
+
+app.post('/pipeline/run', async (req, res, next) => {
+  try {
+    const { brand, topic, region, platforms, format } = req.body || {};
     if (!brand) return res.status(400).json({ error: 'brand is required' });
 
-    // Don't block the HTTP response on a multi-minute pipeline run
-    runContentPipeline({ brand, topic, region, platforms, format }).catch((err) => {
-      console.error('[pipeline] run failed:', err.message);
-    });
+    // A full run takes minutes (image gen, video render, IG container processing),
+    // so don't hold the HTTP connection open — return the id and let the
+    // dashboard poll.
+    runContentPipeline({ brand, topic, region, platforms, format }).catch((err) =>
+      console.error('[pipeline] run failed:', err.message)
+    );
 
-    res.json({ status: 'started', message: 'Pipeline running in background — check logs or Postgres content_pipeline_runs for status.' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json({ status: 'started' });
+  } catch (err) { next(err); }
 });
 
-app.get('/pipeline/:id', async (req, res) => {
-  const { query } = require('./db/db');
-  const result = await query('SELECT * FROM content_pipeline_runs WHERE id = $1', [req.params.id]);
-  if (result.rows.length === 0) return res.status(404).json({ error: 'not found' });
-  res.json(result.rows[0]);
-});
-
-/**
- * Webhook receiver for platform comment/DM events.
- * TODO: wire this to your actual Meta Graph API webhook subscription
- * (comments/messages) — this route is the entry point Meta will POST to.
- * Verify Meta's webhook signature here before trusting the payload.
- */
-app.post('/webhook/engagement', async (req, res) => {
+app.get('/pipeline/:id', async (req, res, next) => {
   try {
-    const { platform, message_text, contact_handle, contact_phone, contact_name } = req.body;
-    const result = await handleEngagementEvent({ platform, message_text, contact_handle, contact_phone, contact_name });
-    res.json(result);
-  } catch (err) {
-    console.error('[webhook] engagement handling failed:', err.message);
-    res.status(500).json({ error: err.message });
-  }
+    const r = await query('SELECT * FROM content_pipeline_runs WHERE id = $1', [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Run not found' });
+    res.json(r.rows[0]);
+  } catch (err) { next(err); }
 });
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// ---------------- Webhooks ----------------
+// NOTE: this sits behind requireAuth, so Meta cannot reach it as-is. When you
+// wire the real Meta webhook, move this route ABOVE `app.use(requireAuth)` and
+// verify Meta's X-Hub-Signature-256 header instead of using a session.
+app.post('/webhook/engagement', async (req, res, next) => {
+  try {
+    const result = await handleEngagementEvent(req.body || {});
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// Central error handler — no route should leak a stack trace to the browser.
+app.use((err, req, res, _next) => {
+  console.error('[server]', err.message);
+  res.status(500).json({ error: err.message });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`[server] listening on port ${PORT}`));

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UIC Agent Worklist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1418; --panel:#151D23; --panel-2:#1B252C; --line:#26333C;
+    --ink:#E2E9ED; --ink-dim:#8497A3; --ink-faint:#5B6B76;
+    --scan:#4FD6E6;            /* phosphor cyan — the scanner accent */
+    --ok:#3FB950; --warn:#D9A441; --bad:#F0553F; --idle:#5B6B76;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+       -webkit-font-smoothing:antialiased}
+
+  header{border-bottom:1px solid var(--line);padding:14px 20px;display:flex;align-items:center;
+         gap:16px;position:sticky;top:0;background:var(--bg);z-index:10;flex-wrap:wrap}
+  .mark{font-family:var(--mono);font-weight:600;letter-spacing:.14em;font-size:12px;color:var(--scan);
+        text-transform:uppercase}
+  .mark span{color:var(--ink-faint)}
+  .spacer{flex:1}
+
+  button{font-family:var(--sans);font-size:13px;font-weight:600;border-radius:5px;cursor:pointer;
+         border:1px solid var(--line);background:var(--panel-2);color:var(--ink);padding:8px 14px;
+         transition:border-color .15s,background .15s}
+  button:hover{border-color:var(--scan);background:var(--panel)}
+  button:focus-visible{outline:2px solid var(--scan);outline-offset:2px}
+  button.primary{background:var(--scan);color:#06181C;border-color:var(--scan)}
+  button.primary:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--ink-dim)}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;
+         background:var(--line);border-bottom:1px solid var(--line)}
+  .stat{background:var(--bg);padding:14px 20px}
+  .stat .k{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+           color:var(--ink-faint)}
+  .stat .v{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:3px}
+  .stat .v.cash{color:var(--scan)}
+
+  main{padding:20px;max-width:1500px;margin:0 auto}
+
+  .bar{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  h2{font-size:12px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;
+     color:var(--ink-dim);font-weight:600}
+  .hint{font-size:12px;color:var(--ink-faint)}
+
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);
+        border-radius:6px;overflow:hidden}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--ink-faint);text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);
+     font-weight:500;background:var(--panel-2)}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr{cursor:pointer;transition:background .12s}
+  tbody tr:hover{background:var(--panel-2)}
+  tbody tr:last-child td{border-bottom:none}
+  .id{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .brand{font-weight:600}
+  .time{font-family:var(--mono);font-size:11px;color:var(--ink-dim);white-space:nowrap}
+  .cost{font-family:var(--mono);font-size:12px;color:var(--scan);text-align:right}
+
+  /* Signature: the stage tracker — a study moving through acquisition -> recon -> report */
+  .track{display:flex;gap:3px;align-items:center}
+  .seg{height:5px;width:34px;border-radius:2px;background:#22303A}
+  .seg.done{background:var(--ok)}
+  .seg.active{background:var(--scan);animation:pulse 1.1s ease-in-out infinite}
+  .seg.fail{background:var(--bad)}
+  .seg.review{background:var(--warn)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){.seg.active{animation:none}}
+  .track-label{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-left:6px;
+               text-transform:uppercase;letter-spacing:.06em}
+
+  .pill{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 7px;
+        border-radius:3px;text-transform:uppercase;letter-spacing:.06em}
+  .pill.success,.pill.published{background:rgba(63,185,80,.14);color:var(--ok)}
+  .pill.failed{background:rgba(240,85,63,.14);color:var(--bad)}
+  .pill.needs_review{background:rgba(217,164,65,.14);color:var(--warn)}
+  .pill.running,.pill.pending{background:rgba(79,214,230,.14);color:var(--scan)}
+
+  .empty{padding:56px 20px;text-align:center;color:var(--ink-faint);background:var(--panel);
+         border:1px solid var(--line);border-radius:6px}
+  .empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:6px}
+
+  /* Drawer — the per-run agent breakdown */
+  .scrim{position:fixed;inset:0;background:rgba(4,8,10,.72);opacity:0;pointer-events:none;
+         transition:opacity .18s;z-index:20}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(620px,100%);background:var(--bg);
+          border-left:1px solid var(--line);transform:translateX(100%);transition:transform .22s ease;
+          z-index:21;overflow-y:auto}
+  .drawer.open{transform:none}
+  @media (prefers-reduced-motion:reduce){.drawer,.scrim{transition:none}}
+  .dhead{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;
+         gap:12px;position:sticky;top:0;background:var(--bg)}
+  .dhead h3{font-size:15px;flex:1}
+  .dbody{padding:20px}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;font-size:13px;margin-bottom:20px}
+  .kv dt{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+         color:var(--ink-faint);padding-top:3px}
+  .kv dd{word-break:break-word}
+  .kv dd a{color:var(--scan)}
+
+  .arow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);
+        font-size:13px}
+  .arow:last-child{border-bottom:none}
+  .aname{font-family:var(--mono);font-size:12px;flex:1}
+  .adur{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .acost{font-family:var(--mono);font-size:11px;color:var(--scan);min-width:52px;text-align:right}
+  .aerr{font-family:var(--mono);font-size:11px;color:var(--bad);padding:6px 10px;margin:2px 0 8px;
+        background:rgba(240,85,63,.07);border-left:2px solid var(--bad);border-radius:0 3px 3px 0;
+        white-space:pre-wrap;word-break:break-word}
+
+  .asset{display:block;margin:6px 0;font-family:var(--mono);font-size:11px;color:var(--scan);
+         word-break:break-all}
+  .thumb{max-width:150px;border-radius:5px;border:1px solid var(--line);margin-top:6px;display:block}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
+         background:var(--panel-2);border:1px solid var(--line);padding:11px 18px;border-radius:6px;
+         font-size:13px;transition:transform .2s;z-index:30;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  .toast.show{transform:translateX(-50%)}
+  .toast.err{border-color:var(--bad);color:var(--bad)}
+  .toast.ok{border-color:var(--ok)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mark">UIC <span>/</span> Agent Worklist</div>
+  <div class="spacer"></div>
+  <button id="refresh" class="ghost">Refresh</button>
+  <button id="run" class="primary">Run pipeline</button>
+  <button id="logout" class="ghost">Sign out</button>
+</header>
+
+<div class="stats" id="stats"></div>
+
+<main>
+  <div class="bar">
+    <h2>Runs</h2>
+    <span class="hint">Select a run to see every agent, its cost, and any failure.</span>
+  </div>
+  <div id="table"></div>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Run detail">
+  <div class="dhead">
+    <h3 id="dtitle">Run</h3>
+    <button id="dclose" class="ghost">Close</button>
+  </div>
+  <div class="dbody" id="dbody"></div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STAGES = ['intelligence','creation','distribution'];
+
+function toast(msg, kind){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (kind || '');
+  setTimeout(()=>{ t.className = 'toast ' + (kind||''); }, 3800);
+}
+
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+function ago(ts){
+  const s = Math.floor((Date.now() - new Date(ts)) / 1000);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+// The stage tracker: which of the 3 stages this run has cleared.
+function track(run){
+  const cur = STAGES.indexOf(run.stage);
+  const done = run.stage === 'done';
+  const failed = run.status === 'failed';
+  const review = run.status === 'needs_review';
+
+  const segs = STAGES.map((_, i) => {
+    if (done) return 'done';
+    if (i < cur) return 'done';
+    if (i === cur) return failed ? 'fail' : review ? 'review' : 'active';
+    return '';
+  }).map(c => '<div class="seg ' + c + '"></div>').join('');
+
+  const label = done ? 'complete' : failed ? (run.stage + ' failed') : run.stage;
+  return '<div class="track">' + segs + '<span class="track-label">' + esc(label) + '</span></div>';
+}
+
+async function load(){
+  const [statsRes, runsRes] = await Promise.all([
+    fetch('/api/stats'), fetch('/api/runs')
+  ]);
+  if (statsRes.status === 401) { location.href = '/login'; return; }
+
+  const stats = await statsRes.json();
+  const runs = await runsRes.json();
+
+  document.getElementById('stats').innerHTML = [
+    ['Runs', stats.total_runs],
+    ['Published', stats.published],
+    ['Needs review', stats.needs_review],
+    ['Failed', stats.failed],
+    ['Leads', stats.leads],
+    ['Spend', '$' + Number(stats.total_cost || 0).toFixed(2), 'cash']
+  ].map(([k,v,cls]) =>
+    '<div class="stat"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div></div>'
+  ).join('');
+
+  const el = document.getElementById('table');
+  if (!runs.length){
+    el.innerHTML = '<div class="empty"><b>No runs yet</b>Hit “Run pipeline” to generate and publish your first post.</div>';
+    return;
+  }
+
+  el.innerHTML = '<table><thead><tr>' +
+    '<th>Brand</th><th>Topic</th><th>Progress</th><th>Status</th>' +
+    '<th>Agents</th><th style="text-align:right">Cost</th><th>Started</th>' +
+    '</tr></thead><tbody>' +
+    runs.map(r => {
+      const topic = (r.script && r.script.hook) || (r.trend_source && r.trend_source.trends
+        && r.trend_source.trends[0] && r.trend_source.trends[0].topic) || '—';
+      return '<tr data-id="'+r.id+'">' +
+        '<td class="brand">'+esc(r.brand)+'<div class="id">'+r.id.slice(0,8)+'</div></td>' +
+        '<td>'+esc(topic.slice(0,58))+'</td>' +
+        '<td>'+track(r)+'</td>' +
+        '<td><span class="pill '+esc(r.status)+'">'+esc(r.status)+'</span></td>' +
+        '<td class="id">'+(r.ok_agents||0)+'/'+(r.total_agents||0)+
+          (r.failed_agents > 0 ? ' <span style="color:var(--bad)">·'+r.failed_agents+' failed</span>' : '') + '</td>' +
+        '<td class="cost">$'+Number(r.cost||0).toFixed(3)+'</td>' +
+        '<td class="time">'+ago(r.created_at)+'</td>' +
+      '</tr>';
+    }).join('') + '</tbody></table>';
+
+  el.querySelectorAll('tr[data-id]').forEach(tr =>
+    tr.addEventListener('click', () => openRun(tr.dataset.id))
+  );
+}
+
+async function openRun(id){
+  const res = await fetch('/api/runs/' + id);
+  if (!res.ok) return toast('Could not load that run', 'err');
+  const d = await res.json();
+
+  document.getElementById('dtitle').textContent = d.run.brand;
+
+  const a = d.run.assets || {};
+  const img = a.image_agent && a.image_agent.image_urls && a.image_agent.image_urls[0];
+  const vid = a.video_agent && a.video_agent.video_url;
+  const aud = a.voice_agent && a.voice_agent.audio_url;
+
+  let html = '<dl class="kv">' +
+    '<dt>Run</dt><dd class="id">'+d.run.id+'</dd>' +
+    '<dt>Stage</dt><dd><span class="pill '+esc(d.run.status)+'">'+esc(d.run.stage)+' · '+esc(d.run.status)+'</span></dd>' +
+    '<dt>Started</dt><dd>'+new Date(d.run.created_at).toLocaleString()+'</dd>';
+
+  if (d.run.script) {
+    html += '<dt>Hook</dt><dd>'+esc(d.run.script.hook || '—')+'</dd>';
+    if (d.run.script.cta) html += '<dt>CTA</dt><dd>'+esc(d.run.script.cta)+'</dd>';
+  }
+  if (a.caption_agent && a.caption_agent.caption)
+    html += '<dt>Caption</dt><dd>'+esc(a.caption_agent.caption)+'</dd>';
+  if (a.hashtag_agent && a.hashtag_agent.hashtags)
+    html += '<dt>Hashtags</dt><dd class="id">'+esc(a.hashtag_agent.hashtags.join(' '))+'</dd>';
+  if (a.viral_prediction_agent && a.viral_prediction_agent.predicted_score != null)
+    html += '<dt>Viral score</dt><dd>'+a.viral_prediction_agent.predicted_score+'</dd>';
+  html += '</dl>';
+
+  if (img || vid || aud) {
+    html += '<h2 style="margin:0 0 8px">Assets</h2>';
+    if (img) html += '<img class="thumb" src="'+esc(img)+'" alt="Generated image">';
+    if (vid) html += '<a class="asset" href="'+esc(vid)+'" target="_blank" rel="noopener">▸ video.mp4</a>';
+    if (aud) html += '<a class="asset" href="'+esc(aud)+'" target="_blank" rel="noopener">▸ voiceover.mp3</a>';
+    html += '<div style="height:20px"></div>';
+  }
+
+  if (d.posts && d.posts.length) {
+    html += '<h2 style="margin:0 0 8px">Published</h2>';
+    d.posts.forEach(p => {
+      const link = p.metrics && p.metrics.permalink;
+      html += '<div class="arow"><span class="aname">'+esc(p.platform)+'</span>' +
+        (link ? '<a class="asset" href="'+esc(link)+'" target="_blank" rel="noopener">open post ↗</a>'
+              : '<span class="id">'+esc(p.external_post_id||'')+'</span>') + '</div>';
+    });
+    html += '<div style="height:20px"></div>';
+  }
+
+  html += '<h2 style="margin:0 0 8px">Agents</h2>';
+  html += d.agents.map(ag => {
+    let row = '<div class="arow">' +
+      '<span class="pill '+esc(ag.status)+'">'+(ag.status==='success'?'ok':esc(ag.status))+'</span>' +
+      '<span class="aname">'+esc(ag.agent_name)+'</span>' +
+      '<span class="adur">'+(ag.duration_ms||0)+'ms</span>' +
+      '<span class="acost">$'+Number(ag.cost_usd||0).toFixed(3)+'</span>' +
+    '</div>';
+    if (ag.error) row += '<div class="aerr">'+esc(ag.error)+'</div>';
+    return row;
+  }).join('');
+
+  document.getElementById('dbody').innerHTML = html;
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('scrim').classList.add('open');
+}
+
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('scrim').classList.remove('open');
+}
+document.getElementById('dclose').onclick = closeDrawer;
+document.getElementById('scrim').onclick = closeDrawer;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+document.getElementById('refresh').onclick = () => load();
+
+document.getElementById('run').onclick = async () => {
+  const brand = prompt('Brand', 'usmanpura_imaging');
+  if (!brand) return;
+  const btn = document.getElementById('run');
+  btn.disabled = true; btn.textContent = 'Starting…';
+  try {
+    const r = await fetch('/pipeline/run', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ brand, platforms:['instagram'] })
+    });
+    if (!r.ok) throw new Error((await r.json()).error || 'Failed to start');
+    toast('Pipeline started — this takes a few minutes', 'ok');
+    setTimeout(load, 1500);
+  } catch (e) {
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Run pipeline';
+  }
+};
+
+document.getElementById('logout').onclick = async () => {
+  await fetch('/logout', { method:'POST' });
+  location.href = '/login';
+};
+
+load();
+setInterval(load, 10000); // runs take minutes; a 10s poll keeps the board honest
+</script>
+</body>
+</html>
