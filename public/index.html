@@ -15,31 +15,29 @@
     --ok:#1B9E55; --ok-soft:#E5F6EC;
     --warn:#C77E14; --warn-soft:#FCF2DF;
     --bad:#D64533; --bad-soft:#FCEAE7;
-    --run:#0E8C94;
     --shadow:0 1px 2px rgba(22,35,46,.05),0 4px 16px rgba(22,35,46,.06);
     --shadow-lg:0 4px 12px rgba(22,35,46,.08),0 16px 40px rgba(22,35,46,.12);
     --sans:'Inter',system-ui,sans-serif; --disp:'Sora',var(--sans);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;
        -webkit-font-smoothing:antialiased}
 
-  /* ---------- entrance animations ---------- */
   @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-  .rise{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+  /* entrance animation only on first paint — .first-load scopes it */
+  .first-load .rise{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
-  /* ---------- header ---------- */
   header{background:var(--card);border-bottom:1px solid var(--line);padding:14px 24px;
          display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;flex-wrap:wrap}
-  .logo{font-family:var(--disp);font-weight:700;font-size:16px;color:var(--ink);display:flex;
-        align-items:center;gap:9px}
-  .logo .dot{width:9px;height:9px;border-radius:50%;background:var(--teal);
-             box-shadow:0 0 0 4px var(--teal-soft)}
+  .logo{font-family:var(--disp);font-weight:700;font-size:16px;display:flex;align-items:center;gap:9px}
+  .logo .dot{width:9px;height:9px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px var(--teal-soft)}
   .logo small{font-weight:400;color:var(--ink-3);font-size:12px;font-family:var(--sans)}
   .spacer{flex:1}
+  .live{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-3);font-weight:500}
+  .live .pulse{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:blink 2s ease-in-out infinite}
+  @keyframes blink{50%{opacity:.25}}
 
   button{font-family:var(--sans);font-size:13.5px;font-weight:600;border-radius:9px;cursor:pointer;
          border:1px solid var(--line-2);background:var(--card);color:var(--ink);padding:9px 16px;
@@ -47,8 +45,7 @@
   button:hover{border-color:var(--teal);color:var(--teal);transform:translateY(-1px)}
   button:active{transform:none}
   button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
-  button.primary{background:var(--teal);border-color:var(--teal);color:#fff;
-                 box-shadow:0 2px 8px rgba(14,140,148,.25)}
+  button.primary{background:var(--teal);border-color:var(--teal);color:#fff;box-shadow:0 2px 8px rgba(14,140,148,.25)}
   button.primary:hover{background:var(--teal-deep);color:#fff;box-shadow:0 4px 14px rgba(14,140,148,.35)}
   button.ghost{border-color:transparent;color:var(--ink-2)}
   button.ghost:hover{color:var(--teal);transform:none}
@@ -56,34 +53,25 @@
 
   main{max-width:1240px;margin:0 auto;padding:26px 24px 80px}
 
-  /* ---------- stat cards ---------- */
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px}
-  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;
-        box-shadow:var(--shadow)}
-  .stat .k{font-size:11.5px;font-weight:600;color:var(--ink-3);text-transform:uppercase;
-           letter-spacing:.05em}
-  .stat .v{font-family:var(--disp);font-size:28px;font-weight:700;margin-top:2px;
-           transition:transform .3s ease}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat .k{font-size:11.5px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+  .stat .v{font-family:var(--disp);font-size:28px;font-weight:700;margin-top:2px;transition:transform .3s ease}
   .stat .v.bump{transform:scale(1.12)}
-  .stat.teal .v{color:var(--teal)}
-  .stat.ok .v{color:var(--ok)}
-  .stat.warn .v{color:var(--warn)}
-  .stat.bad .v{color:var(--bad)}
+  .stat.teal .v{color:var(--teal)} .stat.ok .v{color:var(--ok)}
+  .stat.warn .v{color:var(--warn)} .stat.bad .v{color:var(--bad)}
 
-  /* ---------- section ---------- */
   .sec-head{display:flex;align-items:baseline;gap:10px;margin:0 0 14px;flex-wrap:wrap}
   h2{font-family:var(--disp);font-size:17px;font-weight:600}
   .sub{font-size:13px;color:var(--ink-3)}
 
-  /* ---------- run cards ---------- */
   .runs{display:flex;flex-direction:column;gap:14px}
   .run-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;
-            box-shadow:var(--shadow);cursor:pointer;transition:box-shadow .2s ease,transform .2s ease,
-            border-color .2s ease}
+            box-shadow:var(--shadow);cursor:pointer;transition:box-shadow .2s,transform .2s,border-color .2s}
   .run-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--line-2)}
 
   .run-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-  .run-brand{font-family:var(--disp);font-weight:600;font-size:15px}
+  .run-brand{font-family:var(--disp);font-weight:600;font-size:15px;text-transform:capitalize}
   .run-topic{color:var(--ink-2);font-size:13.5px;flex:1;min-width:200px;overflow:hidden;
              text-overflow:ellipsis;white-space:nowrap}
   .run-time{font-size:12px;color:var(--ink-3);white-space:nowrap}
@@ -97,19 +85,15 @@
   .badge.needs_review{background:var(--warn-soft);color:var(--warn)}
   .badge.running,.badge.pending{background:var(--teal-soft);color:var(--teal)}
   .badge.running::before{animation:blink 1s ease-in-out infinite}
-  @keyframes blink{50%{opacity:.25}}
 
-  /* ---------- THE PROCESS RAIL (signature) ----------
-     3 steps ka journey: Research -> Create -> Publish.
-     Fill bar animate hota hai, current step pulse karta hai. */
-  .rail{display:flex;align-items:center;gap:0}
+  /* process rail */
+  .rail{display:flex;align-items:center}
   .step{display:flex;align-items:center;gap:9px;flex:0 0 auto}
   .step-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
              border:2px solid var(--line-2);background:var(--card);color:var(--ink-3);
-             font-size:15px;transition:all .3s ease;position:relative;z-index:1}
-  .step-label{font-size:12.5px;font-weight:600;color:var(--ink-3);transition:color .3s ease}
-  .step-sub{font-size:11px;color:var(--ink-3);font-weight:400}
-
+             font-size:15px;transition:all .3s ease}
+  .step-label{font-size:12.5px;font-weight:600;color:var(--ink-3);transition:color .3s}
+  .step-sub{font-size:11px;color:var(--ink-3)}
   .step.done .step-icon{background:var(--ok);border-color:var(--ok);color:#fff}
   .step.done .step-label{color:var(--ink)}
   .step.active .step-icon{background:var(--teal);border-color:var(--teal);color:#fff;
@@ -138,7 +122,7 @@
          border-radius:16px;color:var(--ink-3)}
   .empty b{display:block;color:var(--ink);font-family:var(--disp);font-size:17px;margin-bottom:6px}
 
-  /* ---------- drawer ---------- */
+  /* drawer */
   .scrim{position:fixed;inset:0;background:rgba(22,35,46,.32);backdrop-filter:blur(2px);
          opacity:0;pointer-events:none;transition:opacity .22s;z-index:20}
   .scrim.open{opacity:1;pointer-events:auto}
@@ -148,7 +132,7 @@
   .drawer.open{transform:none}
   .dhead{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;
          gap:12px;position:sticky;top:0;background:var(--card);z-index:2}
-  .dhead h3{font-family:var(--disp);font-size:16px;font-weight:600;flex:1}
+  .dhead h3{font-family:var(--disp);font-size:16px;font-weight:600;flex:1;text-transform:capitalize}
   .dbody{padding:24px}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;
@@ -162,15 +146,15 @@
 
   .caption-box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
                font-size:13px;white-space:pre-wrap;line-height:1.6;max-height:180px;overflow-y:auto}
-  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .tag{background:var(--teal-soft);color:var(--teal-deep);font-size:12px;font-weight:500;
        padding:3px 10px;border-radius:99px}
 
   .score-wrap{display:flex;align-items:center;gap:12px}
   .score-bar{flex:1;height:8px;background:var(--line);border-radius:99px;overflow:hidden}
   .score-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--warn),var(--ok));
-              transform-origin:left;animation:grow .8s cubic-bezier(.2,.7,.3,1) both}
-  @keyframes grow{from{transform:scaleX(0)}}
+              animation:grow .8s cubic-bezier(.2,.7,.3,1) both}
+  @keyframes grow{from{width:0}}
   .score-num{font-family:var(--disp);font-weight:700;font-size:16px}
 
   .thumb{width:100%;max-width:220px;border-radius:12px;border:1px solid var(--line);display:block;
@@ -179,41 +163,33 @@
               font-size:13px;text-decoration:none;margin:4px 14px 4px 0}
   .asset-link:hover{text-decoration:underline}
 
-  /* agent timeline */
   .tl{position:relative;padding-left:26px}
   .tl::before{content:'';position:absolute;left:9px;top:8px;bottom:8px;width:2px;background:var(--line)}
   .tl-item{position:relative;padding:8px 0;display:flex;align-items:center;gap:10px;
            animation:rise .4s ease both}
   .tl-item .node{position:absolute;left:-26px;top:50%;transform:translateY(-50%);width:20px;height:20px;
-                 border-radius:50%;display:grid;place-items:center;font-size:11px;color:#fff;
-                 background:var(--ink-3)}
+                 border-radius:50%;display:grid;place-items:center;font-size:11px;color:#fff;background:var(--ink-3)}
   .tl-item.success .node{background:var(--ok)}
   .tl-item.failed .node{background:var(--bad)}
   .tl-item.needs_review .node{background:var(--warn)}
-  .tl-name{font-weight:600;font-size:13.5px;flex:1}
+  .tl-name{font-weight:600;font-size:13.5px}
   .tl-desc{font-size:12px;color:var(--ink-3)}
   .tl-time{font-size:12px;color:var(--ink-3);white-space:nowrap}
-  .tl-cost{font-family:var(--disp);font-size:12px;font-weight:600;color:var(--teal);min-width:52px;
-           text-align:right}
+  .tl-cost{font-family:var(--disp);font-size:12px;font-weight:600;color:var(--teal);min-width:52px;text-align:right}
   .tl-err{margin:2px 0 8px;padding:10px 13px;background:var(--bad-soft);color:#8C2C1F;
           border-radius:9px;font-size:12.5px;line-height:1.5;word-break:break-word}
   .tl-err b{display:block;color:var(--bad);margin-bottom:3px;font-size:12px}
 
-  .pub-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);
-           font-size:13.5px}
+  .pub-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
   .pub-row:last-child{border-bottom:none}
   .pub-row .plat{font-weight:600;flex:1;text-transform:capitalize}
 
-  /* toast */
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(90px);
          background:var(--ink);color:#fff;padding:12px 20px;border-radius:12px;font-size:13.5px;
-         font-weight:500;transition:transform .25s cubic-bezier(.2,.7,.3,1);z-index:30;
-         box-shadow:var(--shadow-lg)}
+         font-weight:500;transition:transform .25s cubic-bezier(.2,.7,.3,1);z-index:30;box-shadow:var(--shadow-lg)}
   .toast.show{transform:translateX(-50%)}
-  .toast.err{background:var(--bad)}
-  .toast.ok{background:var(--ok)}
+  .toast.err{background:var(--bad)} .toast.ok{background:var(--ok)}
 
-  /* run modal */
   .modal-scrim{position:fixed;inset:0;background:rgba(22,35,46,.32);backdrop-filter:blur(2px);
                display:none;place-items:center;z-index:25;padding:20px}
   .modal-scrim.open{display:grid;animation:fadeIn .18s ease}
@@ -225,8 +201,7 @@
   .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
   .field input,.field select{width:100%;border:1px solid var(--line-2);border-radius:10px;
         padding:10px 12px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--card)}
-  .field input:focus,.field select:focus{outline:none;border-color:var(--teal);
-        box-shadow:0 0 0 3px var(--teal-soft)}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
   .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
 
   @media (max-width:640px){
@@ -235,11 +210,12 @@
   }
 </style>
 </head>
-<body>
+<body class="first-load">
 
 <header class="rise">
   <div class="logo"><span class="dot"></span>UIC Content Studio <small>AI agents for growth</small></div>
   <div class="spacer"></div>
+  <span class="live"><span class="pulse"></span>Live — updates automatically</span>
   <button id="refresh" class="ghost">↻ Refresh</button>
   <button id="runBtn" class="primary">+ New post</button>
   <button id="logout" class="ghost">Sign out</button>
@@ -248,9 +224,9 @@
 <main>
   <div class="stats" id="stats"></div>
 
-  <div class="sec-head rise" style="animation-delay:.08s">
+  <div class="sec-head rise">
     <h2>Content runs</h2>
-    <span class="sub">Har run = ek post banne ka poora safar. Card par click karke detail dekho.</span>
+    <span class="sub">Each run is one post's journey from research to publish. Click a card for details.</span>
   </div>
   <div class="runs" id="runs"></div>
 </main>
@@ -266,8 +242,8 @@
 
 <div class="modal-scrim" id="modalScrim">
   <div class="modal">
-    <h3>Naya post banao</h3>
-    <p>Agents research karenge, content banayenge, aur publish karenge. 2–5 minute lagte hain.</p>
+    <h3>Create a new post</h3>
+    <p>Agents will research a topic, create the content, and publish it. Takes 2–5 minutes.</p>
     <div class="field">
       <label for="mBrand">Brand</label>
       <select id="mBrand">
@@ -278,7 +254,7 @@
       </select>
     </div>
     <div class="field">
-      <label for="mTopic">Topic <span style="font-weight:400;color:var(--ink-3)">(khaali chhodo — Trend Agent khud dhundh lega)</span></label>
+      <label for="mTopic">Topic <span style="font-weight:400;color:var(--ink-3)">(leave empty — Trend Agent will pick one)</span></label>
       <input id="mTopic" placeholder="e.g. MRI myths, dengue testing…">
     </div>
     <div class="modal-actions">
@@ -291,34 +267,34 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* Agent ke naam simple bhasha me — dashboard dekhne wale ko turant samajh aaye */
+/* Friendly English names + one-line explanation for every agent */
 const AGENT_INFO = {
-  trend_agent:            ['Trend research',      'Aaj kya relevant hai, web se dhundta hai'],
-  competitor_agent:       ['Competitor check',    'Competitors kya post kar rahe hain'],
-  script_agent:           ['Script writing',      'Reel ka script likhta hai'],
-  caption_agent:          ['Caption',             'Post ka caption likhta hai'],
-  hashtag_agent:          ['Hashtags',            'Sahi hashtags chunta hai'],
-  image_agent:            ['Image banana',        'AI se post ki image banata hai'],
-  thumbnail_agent:        ['Thumbnail',           'Reel ka cover image'],
-  voice_agent:            ['Voiceover',           'Script ko awaaz deta hai'],
-  subtitle_agent:         ['Subtitles',           'Video ke captions banata hai'],
-  video_agent:            ['Video banana',        'Image + voice + subtitles = reel'],
-  viral_prediction_agent: ['Quality score',       'Post kitna chalega, score deta hai'],
-  instagram_publisher:    ['Instagram post',      'Instagram par publish karta hai'],
-  facebook_publisher:     ['Facebook post',       'Facebook par publish karta hai'],
-  youtube_shorts_publisher:['YouTube Short',      'YouTube par publish karta hai'],
-  linkedin_publisher:     ['LinkedIn post',       'LinkedIn par publish karta hai'],
-  lead_qualification_agent:['Lead check',         'Comment/DM lead hai ya nahi'],
-  crm_agent:              ['CRM entry',           'Lead ko CRM me save karta hai'],
-  whatsapp_agent:         ['WhatsApp follow-up',  'Lead ko WhatsApp bhejta hai'],
-  analytics_agent:        ['Analytics',           'Posts ki performance uthata hai'],
-  revenue_optimization_agent:['Revenue analysis', 'Kya kaam kar raha hai, batata hai'],
+  trend_agent:            ['Trend research',    'Finds what is relevant right now via web search'],
+  competitor_agent:       ['Competitor check',  'Looks at what competitors are posting'],
+  script_agent:           ['Script writing',    'Writes the reel script'],
+  caption_agent:          ['Caption',           'Writes the post caption'],
+  hashtag_agent:          ['Hashtags',          'Picks the right hashtag mix'],
+  image_agent:            ['Image generation',  'Creates the post image with AI'],
+  thumbnail_agent:        ['Thumbnail',         'Creates the reel cover image'],
+  voice_agent:            ['Voiceover',         'Converts the script to speech'],
+  subtitle_agent:         ['Subtitles',         'Generates timed captions for the video'],
+  video_agent:            ['Video assembly',    'Combines image + voice + subtitles into a reel'],
+  viral_prediction_agent: ['Quality score',     'Scores how well the post is likely to perform'],
+  instagram_publisher:    ['Instagram post',    'Publishes to Instagram'],
+  facebook_publisher:     ['Facebook post',     'Publishes to Facebook'],
+  youtube_shorts_publisher:['YouTube Short',    'Publishes to YouTube'],
+  linkedin_publisher:     ['LinkedIn post',     'Publishes to LinkedIn'],
+  lead_qualification_agent:['Lead check',       'Decides if a comment/DM is a real lead'],
+  crm_agent:              ['CRM entry',         'Saves the lead to CRM'],
+  whatsapp_agent:         ['WhatsApp follow-up','Sends a WhatsApp message to the lead'],
+  analytics_agent:        ['Analytics',         'Pulls performance metrics for posts'],
+  revenue_optimization_agent:['Revenue analysis','Reports what is working and what is not'],
 };
 
 const STAGE_STEPS = [
-  { key:'intelligence', label:'Research',  sub:'Trend + competitor', icon:'🔍' },
-  { key:'creation',     label:'Create',    sub:'Script, image, video', icon:'✨' },
-  { key:'distribution', label:'Publish',   sub:'Social platforms', icon:'🚀' },
+  { key:'intelligence', label:'Research', sub:'Trends + competitors', icon:'🔍' },
+  { key:'creation',     label:'Create',   sub:'Script, image, video', icon:'✨' },
+  { key:'distribution', label:'Publish',  sub:'Social platforms',     icon:'🚀' },
 ];
 
 const $ = id => document.getElementById(id);
@@ -326,10 +302,10 @@ const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 
 function ago(ts){
   const s = Math.floor((Date.now()-new Date(ts))/1000);
-  if (s<60) return 'abhi ' + s + 's pehle';
-  if (s<3600) return Math.floor(s/60)+' min pehle';
-  if (s<86400) return Math.floor(s/3600)+' ghante pehle';
-  return Math.floor(s/86400)+' din pehle';
+  if (s<60) return s+'s ago';
+  if (s<3600) return Math.floor(s/60)+'m ago';
+  if (s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
 }
 
 function toast(msg,kind){
@@ -339,10 +315,9 @@ function toast(msg,kind){
 
 function statusLabel(s){
   return {success:'Complete',published:'Published',failed:'Failed',
-          needs_review:'Review chahiye',running:'Chal raha hai',pending:'Queue me'}[s]||s;
+          needs_review:'Needs review',running:'Running',pending:'Queued'}[s]||s;
 }
 
-/* ---------- process rail ---------- */
 function rail(run){
   const idx = STAGE_STEPS.findIndex(s=>s.key===run.stage);
   const done = run.stage==='done';
@@ -357,8 +332,7 @@ function rail(run){
       cls = failed?'fail':review?'review':'active';
       icon = failed?'✕':review?'!':s.icon;
     }
-    html += '<div class="step '+cls+'">'+
-      '<div class="step-icon">'+icon+'</div>'+
+    html += '<div class="step '+cls+'"><div class="step-icon">'+icon+'</div>'+
       '<div class="step-label-wrap"><div class="step-label">'+s.label+'</div>'+
       '<div class="step-sub">'+s.sub+'</div></div></div>';
     if (i<STAGE_STEPS.length-1){
@@ -369,55 +343,74 @@ function rail(run){
   return html+'</div>';
 }
 
-/* ---------- stats ---------- */
-let lastStats={};
+/* ---------- smart refresh ----------
+   Poll in the background, but ONLY touch the DOM when the data actually
+   changed. This is what stops the page from visibly "refreshing" every
+   few seconds. A fingerprint of the payload is compared; identical -> skip. */
+let statsFp='', runsFp='';
+let firstPaint=true;
+
 async function loadStats(){
   const r = await fetch('/api/stats');
   if (r.status===401){location.href='/login';return}
   const s = await r.json();
+  const fp = JSON.stringify(s);
+  if (fp===statsFp) return;          // nothing changed -> no re-render
+  const prev = statsFp ? JSON.parse(statsFp) : null;
+  statsFp = fp;
+
   const items=[
-    ['Total runs',s.total_runs,''],['Published',s.published,'ok'],
-    ['Review chahiye',s.needs_review,'warn'],['Failed',s.failed,'bad'],
-    ['Leads',s.leads,''],['Kharcha',(s.total_cost!=null?'$'+Number(s.total_cost).toFixed(2):'—'),'teal'],
+    ['Total runs',s.total_runs,'',           'total_runs'],
+    ['Published',s.published,'ok',           'published'],
+    ['Needs review',s.needs_review,'warn',   'needs_review'],
+    ['Failed',s.failed,'bad',                'failed'],
+    ['Leads',s.leads,'',                     'leads'],
+    ['Spend',(s.total_cost!=null?'$'+Number(s.total_cost).toFixed(2):'—'),'teal','total_cost'],
   ];
-  $('stats').innerHTML = items.map(([k,v,cls],i)=>
-    '<div class="stat '+cls+' rise" style="animation-delay:'+(i*0.05)+'s">'+
-    '<div class="k">'+k+'</div><div class="v" data-k="'+k+'">'+v+'</div></div>').join('');
-  // bump animation on change
-  items.forEach(([k,v])=>{
-    if (lastStats[k]!==undefined && lastStats[k]!==v){
-      const el=document.querySelector('.v[data-k="'+k+'"]');
-      if (el){el.classList.add('bump');setTimeout(()=>el.classList.remove('bump'),350)}
-    }
-    lastStats[k]=v;
-  });
+  $('stats').innerHTML = items.map(([k,v,cls])=>
+    '<div class="stat '+cls+' rise"><div class="k">'+k+'</div>'+
+    '<div class="v" data-k="'+k+'">'+v+'</div></div>').join('');
+
+  if (prev){ // bump only the numbers that changed
+    items.forEach(([k,,,key])=>{
+      if (String(prev[key])!==String(s[key])){
+        const el=document.querySelector('.v[data-k="'+k+'"]');
+        if (el){el.classList.add('bump');setTimeout(()=>el.classList.remove('bump'),350)}
+      }
+    });
+  }
 }
 
-/* ---------- runs ---------- */
 async function loadRuns(){
   const r = await fetch('/api/runs');
   if (r.status===401){location.href='/login';return}
   const runs = await r.json();
-  const el = $('runs');
 
+  // Fingerprint ignores created_at-relative text; includes everything that
+  // affects what's drawn. "Xs ago" alone shouldn't trigger a redraw.
+  const fp = JSON.stringify(runs.map(x=>[x.id,x.stage,x.status,x.ok_agents,x.failed_agents,x.total_agents,x.cost]));
+  if (fp===runsFp) { updateTimes(runs); return; }
+  runsFp = fp;
+
+  const el = $('runs');
   if (!runs.length){
-    el.innerHTML = '<div class="empty rise"><b>Abhi koi run nahi hai</b>'+
-      '"New post" dabao — agents research se lekar publish tak sab kar denge.</div>';
+    el.innerHTML = '<div class="empty rise"><b>No runs yet</b>'+
+      'Click "New post" — the agents will handle everything from research to publishing.</div>';
     return;
   }
 
-  el.innerHTML = runs.map((run,i)=>{
+  el.innerHTML = runs.map(run=>{
     const topic = (run.script&&run.script.hook) ||
       (run.trend_source&&run.trend_source.trends&&run.trend_source.trends[0]&&run.trend_source.trends[0].topic) || '';
     const failNote = run.failed_agents>0
-      ? '<span class="fail-note">'+run.failed_agents+' step fail — click karke dekho</span>' : '';
-    return '<div class="run-card rise" style="animation-delay:'+(Math.min(i,6)*0.06)+'s" data-id="'+run.id+'">'+
+      ? '<span class="fail-note">'+run.failed_agents+' step'+(run.failed_agents>1?'s':'')+' failed — click to see why</span>' : '';
+    return '<div class="run-card rise" data-id="'+run.id+'">'+
       '<div class="run-top">'+
         '<span class="run-brand">'+esc(run.brand.replace(/_/g,' '))+'</span>'+
         '<span class="badge '+esc(run.status)+'">'+statusLabel(run.status)+'</span>'+
         '<span class="run-topic">'+esc(topic)+'</span>'+
         '<span class="run-cost">$'+Number(run.cost||0).toFixed(3)+'</span>'+
-        '<span class="run-time">'+ago(run.created_at)+'</span>'+
+        '<span class="run-time" data-ts="'+run.created_at+'">'+ago(run.created_at)+'</span>'+
       '</div>'+
       rail(run)+
       '<div class="run-meta"><span><b>'+(run.ok_agents||0)+'</b> / '+(run.total_agents||0)+
@@ -428,10 +421,17 @@ async function loadRuns(){
     c.addEventListener('click',()=>openRun(c.dataset.id)));
 }
 
+/* Update only the "Xm ago" text in place — no re-render, no flicker */
+function updateTimes(){
+  document.querySelectorAll('.run-time[data-ts]').forEach(el=>{
+    el.textContent = ago(el.dataset.ts);
+  });
+}
+
 /* ---------- drawer ---------- */
 async function openRun(id){
   const r = await fetch('/api/runs/'+id);
-  if (!r.ok) return toast('Run load nahi hua','err');
+  if (!r.ok) return toast('Could not load that run','err');
   const d = await r.json();
   const run=d.run, a=run.assets||{};
 
@@ -440,15 +440,15 @@ async function openRun(id){
   let html = '<div class="card"><h4>Status</h4>'+rail(run)+
     '<div class="kv" style="margin-top:16px">'+
     '<dt>Status</dt><dd><span class="badge '+esc(run.status)+'">'+statusLabel(run.status)+'</span></dd>'+
-    '<dt>Shuru hua</dt><dd>'+new Date(run.created_at).toLocaleString('en-IN')+'</dd>'+
+    '<dt>Started</dt><dd>'+new Date(run.created_at).toLocaleString('en-IN')+'</dd>'+
     '<dt>Run ID</dt><dd style="color:var(--ink-3);font-size:12px">'+run.id+'</dd></div></div>';
 
   if (run.script){
     html += '<div class="card"><h4>Content</h4><div class="kv">'+
       '<dt>Hook</dt><dd><b>'+esc(run.script.hook||'—')+'</b></dd>'+
-      (run.script.cta?'<dt>CTA</dt><dd>'+esc(run.script.cta)+'</dd>':'')+'</div>';
+      (run.script.cta?'<dt>Call to action</dt><dd>'+esc(run.script.cta)+'</dd>':'')+'</div>';
     if (a.caption_agent&&a.caption_agent.caption)
-      html += '<div style="margin-top:12px"><div class="kv"><dt>Caption</dt><dd></dd></div>'+
+      html += '<div style="margin-top:12px"><div style="font-size:12.5px;font-weight:500;color:var(--ink-3);margin-bottom:6px">Caption</div>'+
         '<div class="caption-box">'+esc(a.caption_agent.caption)+'</div></div>';
     if (a.hashtag_agent&&a.hashtag_agent.hashtags&&a.hashtag_agent.hashtags.length)
       html += '<div class="tags">'+a.hashtag_agent.hashtags.map(h=>'<span class="tag">'+esc(h)+'</span>').join('')+'</div>';
@@ -468,26 +468,26 @@ async function openRun(id){
   const vid=a.video_agent&&a.video_agent.video_url;
   const aud=a.voice_agent&&a.voice_agent.audio_url;
   if (img||vid||aud){
-    html += '<div class="card"><h4>Bane hue assets</h4>';
+    html += '<div class="card"><h4>Generated assets</h4>';
     if (img) html += '<img class="thumb" src="'+esc(img)+'" alt="Generated image" loading="lazy">';
     html += '<div style="margin-top:10px">';
-    if (vid) html += '<a class="asset-link" href="'+esc(vid)+'" target="_blank" rel="noopener">▶ Video dekho</a>';
-    if (aud) html += '<a class="asset-link" href="'+esc(aud)+'" target="_blank" rel="noopener">♪ Voiceover suno</a>';
+    if (vid) html += '<a class="asset-link" href="'+esc(vid)+'" target="_blank" rel="noopener">▶ Watch video</a>';
+    if (aud) html += '<a class="asset-link" href="'+esc(aud)+'" target="_blank" rel="noopener">♪ Listen to voiceover</a>';
     html += '</div></div>';
   }
 
   if (d.posts&&d.posts.length){
-    html += '<div class="card"><h4>Publish hua</h4>';
+    html += '<div class="card"><h4>Published to</h4>';
     d.posts.forEach(p=>{
       const link=p.metrics&&p.metrics.permalink;
       html += '<div class="pub-row"><span class="plat">'+esc(p.platform.replace(/_/g,' '))+'</span>'+
-        (link?'<a class="asset-link" href="'+esc(link)+'" target="_blank" rel="noopener">Post kholo ↗</a>'
+        (link?'<a class="asset-link" href="'+esc(link)+'" target="_blank" rel="noopener">Open post ↗</a>'
              :'<span style="color:var(--ink-3);font-size:12px">'+esc(p.external_post_id||'')+'</span>')+'</div>';
     });
     html += '</div>';
   }
 
-  html += '<div class="card"><h4>Steps — kya hua, step by step</h4><div class="tl">';
+  html += '<div class="card"><h4>Step-by-step breakdown</h4><div class="tl">';
   html += d.agents.map((ag,i)=>{
     const info = AGENT_INFO[ag.agent_name]||[ag.agent_name,''];
     const icon = ag.status==='success'?'✓':ag.status==='failed'?'✕':'!';
@@ -497,7 +497,7 @@ async function openRun(id){
       '<div class="tl-desc">'+esc(info[1])+'</div></div>'+
       '<span class="tl-time">'+((ag.duration_ms||0)/1000).toFixed(1)+'s</span>'+
       '<span class="tl-cost">$'+Number(ag.cost_usd||0).toFixed(3)+'</span></div>';
-    if (ag.error) row += '<div class="tl-err"><b>Kya problem aayi:</b>'+esc(friendlyError(ag.error))+'</div>';
+    if (ag.error) row += '<div class="tl-err"><b>What went wrong:</b>'+esc(friendlyError(ag.error))+'</div>';
     return row;
   }).join('');
   html += '</div></div>';
@@ -507,18 +507,21 @@ async function openRun(id){
   $('scrim').classList.add('open');
 }
 
-/* Errors ko simple bhasha me translate karo jahan pattern pehchana ja sake */
+/* Translate raw API errors into plain instructions where the pattern is known */
 function friendlyError(err){
   if (/billing.hard.limit|billing_limit/i.test(err))
-    return 'OpenAI ka billing limit khatam ho gaya. platform.openai.com → Settings → Limits me limit badhao. ('+err.slice(0,120)+'…)';
+    return 'OpenAI billing limit reached. Go to platform.openai.com → Settings → Limits and raise the monthly limit. ('+err.slice(0,110)+'…)';
   if (/not set/i.test(err))
-    return err+' — Render ke Environment me ye key add karo.';
+    return err+' — add this key in Render → Environment.';
   if (/401|invalid.*key|authentication/i.test(err))
-    return 'API key galat ya expire hai. Render Environment me check karo. ('+err.slice(0,120)+'…)';
+    return 'API key is wrong or expired. Check it in Render → Environment. ('+err.slice(0,110)+'…)';
   if (/429|rate.limit|quota/i.test(err))
-    return 'API ki limit hit ho gayi — thodi der baad try karo. ('+err.slice(0,100)+'…)';
+    return 'API rate limit hit — try again in a few minutes. ('+err.slice(0,100)+'…)';
   return err;
 }
+
+function drawerOpen(){return $('drawer').classList.contains('open')}
+function modalOpen(){return $('modalScrim').classList.contains('open')}
 
 function closeDrawer(){$('drawer').classList.remove('open');$('scrim').classList.remove('open')}
 $('dclose').onclick=closeDrawer;
@@ -538,20 +541,31 @@ $('mGo').onclick=async()=>{
     if (topic) body.topic=topic;
     const r=await fetch('/pipeline/run',{method:'POST',
       headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!r.ok) throw new Error((await r.json()).error||'Start nahi hua');
+    if(!r.ok) throw new Error((await r.json()).error||'Could not start');
     $('modalScrim').classList.remove('open');
-    toast('Pipeline shuru! 2–5 min lagenge — board khud update hoga.','ok');
+    toast('Pipeline started — takes 2–5 minutes. The board updates on its own.','ok');
     setTimeout(loadAll,1200);
   }catch(e){toast(e.message,'err')}
   finally{btn.disabled=false;btn.textContent='Start'}
 };
 
-$('refresh').onclick=loadAll;
+$('refresh').onclick=()=>{statsFp='';runsFp='';loadAll();toast('Refreshed','ok')};
 $('logout').onclick=async()=>{await fetch('/logout',{method:'POST'});location.href='/login'};
 
 function loadAll(){loadStats();loadRuns()}
-loadAll();
-setInterval(loadAll,8000);
+
+loadAll().then?.(()=>{});
+/* entrance animations only once — after first paint, new renders appear without replaying them */
+setTimeout(()=>document.body.classList.remove('first-load'),900);
+
+/* Background poll: skips DOM work when nothing changed, and pauses entirely
+   while the drawer or modal is open so nothing moves under the user. */
+setInterval(()=>{
+  if (document.hidden || drawerOpen() || modalOpen()) return;
+  loadAll();
+},8000);
+/* Relative times tick every 30s without any re-render */
+setInterval(updateTimes,30000);
 </script>
 </body>
 </html>
