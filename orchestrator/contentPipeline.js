@@ -18,6 +18,14 @@ function job(agentName, input, context) {
   return { name: agentName, queueName: AGENT_QUEUE_NAME, data: { input, context } };
 }
 
+/**
+ * Voiceover language per brand. Defaults to Indian English.
+ * Set VOICE_LANGUAGE=hi (or gu) to change globally, or extend this per-brand.
+ */
+function input_language(brand) {
+  return process.env.VOICE_LANGUAGE || 'en';
+}
+
 async function runIntelligenceStage(pipelineRunId, { brand, region }) {
   await updatePipelineStage(pipelineRunId, 'intelligence', 'running');
 
@@ -55,24 +63,78 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel' }
 
   await query(`UPDATE content_pipeline_runs SET script = $1 WHERE id = $2`, [JSON.stringify(script), pipelineRunId]);
 
-  const creationFlow = await flowProducer.add({
+  // The creation stage is NOT one flat parallel fan-out — the media agents have
+  // real data dependencies on each other:
+  //     voice -> subtitle (needs the audio to transcribe)
+  //     image + voice + subtitle -> video (needs all three to assemble)
+  // Running all 8 at once (as the first version did) only "worked" because the
+  // agents were stubs returning fake URLs. With real APIs, subtitle would get
+  // audio_url: null and fail. So: 3 sequential phases, parallel WITHIN each phase.
+
+  const language = input_language(brand);
+  const assets = {};
+  const results = [];
+
+  // --- Phase 1: everything that only needs the script ---
+  const phase1 = await flowProducer.add({
     name: '__stage_root__',
     queueName: AGENT_QUEUE_NAME,
     data: { input: {}, context: { pipelineRunId } },
     children: [
       job('caption_agent', { brand, script }, { pipelineRunId }),
       job('hashtag_agent', { brand, topic }, { pipelineRunId }),
-      job('thumbnail_agent', { script, brand, format }, { pipelineRunId }),
       job('image_agent', { brand, prompt: script.hook }, { pipelineRunId }),
-      job('video_agent', { script, brand }, { pipelineRunId }),
-      job('voice_agent', { script_text: script.full_script, language: 'en' }, { pipelineRunId }),
-      job('subtitle_agent', { audio_url: null, language: 'en' }, { pipelineRunId }),
+      job('voice_agent', { script_text: script.full_script, language }, { pipelineRunId }),
       job('viral_prediction_agent', { script: script.full_script, format }, { pipelineRunId }),
     ],
   });
+  const p1 = await waitForFlowChildren(phase1.job);
+  results.push(...p1);
+  for (const r of p1) assets[r.agent] = r.output;
 
-  const results = await waitForFlowChildren(creationFlow.job);
-  const assets = {};
+  // --- Phase 2: needs Phase 1 outputs (audio for subtitles, image for thumbnail) ---
+  const audioUrl = assets.voice_agent?.audio_url;
+  const imageUrls = assets.image_agent?.image_urls || [];
+
+  const phase2Children = [job('thumbnail_agent', { script, brand, format }, { pipelineRunId })];
+  if (audioUrl) {
+    phase2Children.push(job('subtitle_agent', { audio_url: audioUrl, language }, { pipelineRunId }));
+  } else {
+    console.warn('[contentPipeline] voice_agent produced no audio_url — skipping subtitle_agent');
+  }
+
+  const phase2 = await flowProducer.add({
+    name: '__stage_root__',
+    queueName: AGENT_QUEUE_NAME,
+    data: { input: {}, context: { pipelineRunId } },
+    children: phase2Children,
+  });
+  const p2 = await waitForFlowChildren(phase2.job);
+  results.push(...p2);
+  for (const r of p2) assets[r.agent] = r.output;
+
+  // --- Phase 3: video needs image + voice + subtitles ---
+  if (format === 'reel' && audioUrl && imageUrls.length) {
+    const phase3 = await flowProducer.add(
+      job(
+        'video_agent',
+        {
+          brand,
+          script,
+          image_urls: imageUrls,
+          audio_url: audioUrl,
+          captions: assets.subtitle_agent?.captions || [],
+        },
+        { pipelineRunId }
+      )
+    );
+    const videoResult = await waitForJob(phase3.job);
+    results.push(videoResult);
+    assets[videoResult.agent] = videoResult.output;
+  } else if (format === 'reel') {
+    console.warn('[contentPipeline] skipping video_agent — missing image or audio');
+  }
+
   const failedAgents = [];
   for (const r of results) {
     assets[r.agent] = r.output;
@@ -104,20 +166,41 @@ async function runDistributionStage(pipelineRunId, { brand, script, assets, plat
     linkedin: 'linkedin_publisher',
   };
 
-  const children = platforms
-    .filter((p) => publisherMap[p])
-    .map((p) =>
-      job(
-        publisherMap[p],
-        {
-          brand,
-          caption: assets.caption_agent?.caption,
-          hashtags: assets.hashtag_agent?.hashtags || [],
-          media_url: assets.video_agent?.video_url || assets.image_agent?.image_urls?.[0],
-        },
-        { pipelineRunId }
-      )
+  const videoUrl = assets.video_agent?.video_url;
+  const imageUrl = assets.image_agent?.image_urls?.[0];
+  const caption = assets.caption_agent?.caption;
+  const hashtags = assets.hashtag_agent?.hashtags || [];
+
+  // Each platform wants a different asset — YouTube Shorts is video-only, and
+  // LinkedIn (a B2B channel for referring doctors) reads better as image+text.
+  // Sending the wrong media type here is an instant API error, so pick per platform.
+  const mediaFor = {
+    instagram: videoUrl ? { media_url: videoUrl, media_type: 'reel' } : { media_url: imageUrl, media_type: 'image' },
+    facebook: videoUrl ? { media_url: videoUrl, media_type: 'reel' } : { media_url: imageUrl, media_type: 'image' },
+    youtube_shorts: videoUrl ? { media_url: videoUrl, media_type: 'reel' } : null, // no video => cannot post a Short
+    linkedin: { media_url: imageUrl, media_type: 'image' },
+  };
+
+  const skipped = [];
+  const children = [];
+
+  for (const p of platforms) {
+    if (!publisherMap[p]) continue;
+    const media = mediaFor[p];
+    if (!media || !media.media_url) {
+      skipped.push({ platform: p, reason: 'required media asset was not generated' });
+      continue;
+    }
+    children.push(
+      job(publisherMap[p], { brand, script, caption, hashtags, ...media }, { pipelineRunId })
     );
+  }
+
+  if (skipped.length) console.warn('[contentPipeline] skipped platforms:', skipped);
+  if (!children.length) {
+    await updatePipelineStage(pipelineRunId, 'distribution', 'failed');
+    throw new Error('No platform could be published to — no usable media was generated.');
+  }
 
   const flow = await flowProducer.add({
     name: '__stage_root__',
@@ -131,10 +214,17 @@ async function runDistributionStage(pipelineRunId, { brand, script, assets, plat
   for (const r of results) {
     if (r.status === 'success') {
       await query(
-        `INSERT INTO published_posts (pipeline_run_id, platform, external_post_id, published_at)
-         VALUES ($1, $2, $3, now())`,
-        [pipelineRunId, r.agent.replace('_publisher', ''), r.output?.external_post_id]
+        `INSERT INTO published_posts (pipeline_run_id, platform, external_post_id, published_at, metrics)
+         VALUES ($1, $2, $3, now(), $4)`,
+        [
+          pipelineRunId,
+          r.agent.replace('_publisher', '').replace('_shorts', '_shorts'),
+          r.output?.external_post_id,
+          JSON.stringify({ permalink: r.output?.permalink || null }),
+        ]
       );
+    } else {
+      console.error(`[contentPipeline] ${r.agent} failed to publish:`, r.error);
     }
   }
 
