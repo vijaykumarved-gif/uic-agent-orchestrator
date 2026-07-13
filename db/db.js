@@ -1,0 +1,49 @@
+const { Pool } = require('pg');
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});
+
+async function query(text, params) {
+  return pool.query(text, params);
+}
+
+/** Create a new pipeline run row, returns its id */
+async function createPipelineRun({ brand, platformsTargeted = [] }) {
+  const res = await query(
+    `INSERT INTO content_pipeline_runs (brand, platforms_targeted, stage, status)
+     VALUES ($1, $2, 'queued', 'pending') RETURNING id`,
+    [brand, platformsTargeted]
+  );
+  return res.rows[0].id;
+}
+
+async function updatePipelineStage(pipelineRunId, stage, status, extra = {}) {
+  const fields = ['stage', 'status', 'updated_at'];
+  const values = [stage, status, new Date()];
+  let setClauses = ['stage = $1', 'status = $2', 'updated_at = $3'];
+  let idx = 4;
+  for (const [key, val] of Object.entries(extra)) {
+    setClauses.push(`${key} = $${idx}`);
+    values.push(JSON.stringify(val));
+    idx++;
+  }
+  values.push(pipelineRunId);
+  await query(
+    `UPDATE content_pipeline_runs SET ${setClauses.join(', ')} WHERE id = $${idx}`,
+    values
+  );
+}
+
+/** Log a single agent execution — call this from every agent wrapper */
+async function logAgentRun({ pipelineRunId, agentName, input, output, status, confidence, costUsd, durationMs, error }) {
+  await query(
+    `INSERT INTO agent_runs (pipeline_run_id, agent_name, input, output, status, confidence, cost_usd, duration_ms, error)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [pipelineRunId, agentName, input ? JSON.stringify(input) : null, output ? JSON.stringify(output) : null,
+      status, confidence ?? null, costUsd ?? 0, durationMs ?? null, error ?? null]
+  );
+}
+
+module.exports = { pool, query, createPipelineRun, updatePipelineStage, logAgentRun };
