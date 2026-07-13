@@ -6,7 +6,6 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "start:all": "node index.js & node orchestrator/worker.js & node orchestrator/scheduler.js & wait",
     "worker": "node orchestrator/worker.js",
     "scheduler": "node orchestrator/scheduler.js",
     "migrate": "node db/migrate.js"

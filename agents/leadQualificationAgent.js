@@ -1,5 +1,5 @@
 const { defineAgent } = require('../orchestrator/agentContract');
-const { callClaude } = require('../orchestrator/claudeClient');
+const { callClaudeJSON } = require('../orchestrator/claudeClient');
 
 /**
  * LEAD QUALIFICATION AGENT
@@ -14,8 +14,7 @@ module.exports = defineAgent('lead_qualification_agent', async (input) => {
 Instagram post. Classify: is this a genuine lead (interested in booking a scan/test)?
 Return JSON only: {"is_lead": true|false, "qualification_score": 0.0-1.0, "intent": "", "suggested_reply": ""}`;
 
-  const raw = await callClaude(prompt, { maxTokens: 200, jsonOnly: true });
-  const parsed = JSON.parse(raw);
+  const parsed = await callClaudeJSON(prompt, { maxTokens: 600 });
 
-  return { output: parsed, confidence: parsed.qualification_score, cost: { tokens: 200, usd: 0.003 } };
+  return { output: parsed, confidence: parsed.qualification_score, cost: { tokens: 600, usd: 0.006 } };
 });
