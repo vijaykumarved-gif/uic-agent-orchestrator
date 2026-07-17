@@ -53,6 +53,29 @@
 
   main{max-width:1240px;margin:0 auto;padding:26px 24px 80px}
 
+  /* ---------- service health alerts ---------- */
+  .alerts{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
+  .alert{display:flex;gap:13px;align-items:flex-start;background:var(--card);border-radius:14px;
+         padding:15px 18px;box-shadow:var(--shadow);border:1px solid var(--line);
+         border-left:4px solid var(--bad)}
+  .alert.balance{border-left-color:var(--bad);background:linear-gradient(90deg,var(--bad-soft) 0%,var(--card) 30%)}
+  .alert.invalid_key,.alert.missing_key{border-left-color:var(--warn);
+         background:linear-gradient(90deg,var(--warn-soft) 0%,var(--card) 30%)}
+  .alert.rate_limit,.alert.error{border-left-color:var(--ink-3)}
+  .alert-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+              font-size:17px;flex:0 0 auto}
+  .alert.balance .alert-icon{background:var(--bad-soft)}
+  .alert.invalid_key .alert-icon,.alert.missing_key .alert-icon{background:var(--warn-soft)}
+  .alert.rate_limit .alert-icon,.alert.error .alert-icon{background:var(--bg)}
+  .alert-body{flex:1;min-width:0}
+  .alert-title{font-weight:600;font-size:13.5px;margin-bottom:2px}
+  .alert.balance .alert-title{color:var(--bad)}
+  .alert.invalid_key .alert-title,.alert.missing_key .alert-title{color:var(--warn)}
+  .alert-msg{font-size:13px;color:var(--ink-2);line-height:1.5}
+  .alert-detail{font-size:11.5px;color:var(--ink-3);margin-top:5px;font-family:ui-monospace,monospace;
+                word-break:break-word}
+  .alert-time{font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px}
   .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
   .stat .k{font-size:11.5px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
@@ -222,6 +245,7 @@
 </header>
 
 <main>
+  <div class="alerts" id="alerts"></div>
   <div class="stats" id="stats"></div>
 
   <div class="sec-head rise">
@@ -552,7 +576,44 @@ $('mGo').onclick=async()=>{
 $('refresh').onclick=()=>{statsFp='';runsFp='';loadAll();toast('Refreshed','ok')};
 $('logout').onclick=async()=>{await fetch('/logout',{method:'POST'});location.href='/login'};
 
-function loadAll(){loadStats();loadRuns()}
+/* ---------- service health alerts ----------
+   "Kaunsi API ka balance khatam hua" — provider-level rollup of recent
+   failures, most severe (balance) first. Same fingerprint trick: no DOM
+   churn unless something actually changed. */
+let alertsFp='';
+const ISSUE_TITLES = {
+  balance:     '💳 Balance khatam',
+  invalid_key: '🔑 API key problem',
+  missing_key: '🔑 API key missing',
+  rate_limit:  '⏳ Rate limit',
+  error:       '⚠ Errors aa rahe hain',
+};
+const ISSUE_ICONS = { balance:'💳', invalid_key:'🔑', missing_key:'🔑', rate_limit:'⏳', error:'⚠' };
+
+async function loadAlerts(){
+  const r = await fetch('/api/service-health');
+  if (r.status===401){location.href='/login';return}
+  const d = await r.json();
+  const fp = JSON.stringify(d.alerts.map(a=>[a.provider,a.issue]));
+  if (fp===alertsFp) return;
+  alertsFp = fp;
+
+  const el = $('alerts');
+  if (!d.alerts.length){ el.innerHTML=''; return; }
+
+  el.innerHTML = d.alerts.map(a=>
+    '<div class="alert '+esc(a.issue)+' rise">'+
+      '<div class="alert-icon">'+(ISSUE_ICONS[a.issue]||'⚠')+'</div>'+
+      '<div class="alert-body">'+
+        '<div class="alert-title">'+(ISSUE_TITLES[a.issue]||'Issue')+' — '+esc(a.label)+'</div>'+
+        '<div class="alert-msg">'+esc(a.message)+'</div>'+
+        (a.sample_error?'<div class="alert-detail">'+esc(a.sample_error)+'</div>':'')+
+      '</div>'+
+      '<span class="alert-time">'+ago(a.last_seen)+'</span>'+
+    '</div>').join('');
+}
+
+function loadAll(){loadAlerts();loadStats();loadRuns()}
 
 loadAll().then?.(()=>{});
 /* entrance animations only once — after first paint, new renders appear without replaying them */

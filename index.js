@@ -22,6 +22,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------- Dashboard API ----------------
 
+// Rolls up recent agent failures into per-provider alerts ("OpenAI balance
+// khatam") so users don't have to diagnose raw errors run-by-run.
+app.get('/api/service-health', async (req, res, next) => {
+  try {
+    const { getServiceHealth } = require('./orchestrator/serviceHealth');
+    res.json(await getServiceHealth());
+  } catch (err) { next(err); }
+});
+
 app.get('/api/stats', async (req, res, next) => {
   try {
     const runs = await query(`
