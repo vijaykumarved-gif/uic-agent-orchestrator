@@ -1,6 +1,6 @@
 {
   "name": "uic-agent-system",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Multi-agent content & growth orchestration system for UIC Group",
   "main": "index.js",
   "type": "commonjs",
