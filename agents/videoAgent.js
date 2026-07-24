@@ -21,9 +21,32 @@ const { uploadFromUrl } = require('../orchestrator/storage');
  *   CREATOMATE_API_KEY  — fallback slideshow renderer
  */
 module.exports = defineAgent('video_agent', async (input) => {
-  if (process.env.HEYGEN_API_KEY) return await heygenAvatarVideo(input);
-  if (process.env.CREATOMATE_API_KEY) return await creatomateSlideshow(input);
-  throw new Error('No video provider configured: set HEYGEN_API_KEY (talking avatar) or CREATOMATE_API_KEY (slideshow)');
+  const hasHeygen = !!process.env.HEYGEN_API_KEY;
+  const hasCreatomate = !!process.env.CREATOMATE_API_KEY;
+
+  if (!hasHeygen && !hasCreatomate) {
+    throw new Error('No video provider configured: set HEYGEN_API_KEY (talking avatar) or CREATOMATE_API_KEY (slideshow)');
+  }
+
+  // Prefer the talking avatar; if HeyGen fails for ANY reason (out of credits,
+  // API error, render failure) and Creatomate is available, fall back to the
+  // slideshow so the run still ships a video instead of dying.
+  if (hasHeygen) {
+    try {
+      return await heygenAvatarVideo(input);
+    } catch (err) {
+      if (!hasCreatomate) throw err;
+      const reason = /insufficient_credit|402|credit/i.test(err.message)
+        ? 'HeyGen credits exhausted'
+        : `HeyGen failed (${err.message.slice(0, 120)})`;
+      console.warn(`[video_agent] ${reason} — falling back to Creatomate slideshow`);
+      const result = await creatomateSlideshow(input);
+      result.output.fallback_reason = reason;
+      return result;
+    }
+  }
+
+  return await creatomateSlideshow(input);
 });
 
 /* ========================= HEYGEN (talking avatar) ========================= */
