@@ -25,7 +25,8 @@
 
   @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-  /* entrance animation only on first paint — .first-load scopes it */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes blink{50%{opacity:.25}}
   .first-load .rise{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
@@ -35,9 +36,8 @@
   .logo .dot{width:9px;height:9px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px var(--teal-soft)}
   .logo small{font-weight:400;color:var(--ink-3);font-size:12px;font-family:var(--sans)}
   .spacer{flex:1}
-  .live{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-3);font-weight:500}
-  .live .pulse{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:blink 2s ease-in-out infinite}
-  @keyframes blink{50%{opacity:.25}}
+  .live-chip{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-3);font-weight:500}
+  .live-chip .pulse{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:blink 2s ease-in-out infinite}
 
   button{font-family:var(--sans);font-size:13.5px;font-weight:600;border-radius:9px;cursor:pointer;
          border:1px solid var(--line-2);background:var(--card);color:var(--ink);padding:9px 16px;
@@ -50,20 +50,26 @@
   button.ghost{border-color:transparent;color:var(--ink-2)}
   button.ghost:hover{color:var(--teal);transform:none}
   button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+  button.approve{background:var(--ok);border-color:var(--ok);color:#fff;box-shadow:0 2px 8px rgba(27,158,85,.25)}
+  button.approve:hover{background:#15804A;color:#fff}
+  button.reject{background:var(--card);border-color:var(--line-2);color:var(--bad)}
+  button.reject:hover{border-color:var(--bad);color:var(--bad)}
 
-  main{max-width:1240px;margin:0 auto;padding:26px 24px 80px}
+  /* two-column layout: content + live activity panel */
+  .layout{max-width:1360px;margin:0 auto;padding:26px 24px 80px;display:grid;
+          grid-template-columns:1fr 330px;gap:24px;align-items:start}
+  @media (max-width:1020px){.layout{grid-template-columns:1fr}.panel{position:static!important;order:-1}}
 
   /* ---------- service health alerts ---------- */
   .alerts{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
+  .alerts:empty{display:none;margin:0}
   .alert{display:flex;gap:13px;align-items:flex-start;background:var(--card);border-radius:14px;
-         padding:15px 18px;box-shadow:var(--shadow);border:1px solid var(--line);
-         border-left:4px solid var(--bad)}
+         padding:15px 18px;box-shadow:var(--shadow);border:1px solid var(--line);border-left:4px solid var(--bad)}
   .alert.balance{border-left-color:var(--bad);background:linear-gradient(90deg,var(--bad-soft) 0%,var(--card) 30%)}
   .alert.invalid_key,.alert.missing_key{border-left-color:var(--warn);
          background:linear-gradient(90deg,var(--warn-soft) 0%,var(--card) 30%)}
   .alert.rate_limit,.alert.error{border-left-color:var(--ink-3)}
-  .alert-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
-              font-size:17px;flex:0 0 auto}
+  .alert-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;flex:0 0 auto}
   .alert.balance .alert-icon{background:var(--bad-soft)}
   .alert.invalid_key .alert-icon,.alert.missing_key .alert-icon{background:var(--warn-soft)}
   .alert.rate_limit .alert-icon,.alert.error .alert-icon{background:var(--bg)}
@@ -72,14 +78,14 @@
   .alert.balance .alert-title{color:var(--bad)}
   .alert.invalid_key .alert-title,.alert.missing_key .alert-title{color:var(--warn)}
   .alert-msg{font-size:13px;color:var(--ink-2);line-height:1.5}
-  .alert-detail{font-size:11.5px;color:var(--ink-3);margin-top:5px;font-family:ui-monospace,monospace;
-                word-break:break-word}
+  .alert-detail{font-size:11.5px;color:var(--ink-3);margin-top:5px;font-family:ui-monospace,monospace;word-break:break-word}
   .alert-time{font-size:11.5px;color:var(--ink-3);white-space:nowrap}
 
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px}
-  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
-  .stat .k{font-size:11.5px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
-  .stat .v{font-family:var(--disp);font-size:28px;font-weight:700;margin-top:2px;transition:transform .3s ease}
+  /* ---------- stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:24px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 17px;box-shadow:var(--shadow)}
+  .stat .k{font-size:11px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+  .stat .v{font-family:var(--disp);font-size:26px;font-weight:700;margin-top:2px;transition:transform .3s ease}
   .stat .v.bump{transform:scale(1.12)}
   .stat.teal .v{color:var(--teal)} .stat.ok .v{color:var(--ok)}
   .stat.warn .v{color:var(--warn)} .stat.bad .v{color:var(--bad)}
@@ -88,14 +94,14 @@
   h2{font-family:var(--disp);font-size:17px;font-weight:600}
   .sub{font-size:13px;color:var(--ink-3)}
 
+  /* ---------- run cards ---------- */
   .runs{display:flex;flex-direction:column;gap:14px}
   .run-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;
             box-shadow:var(--shadow);cursor:pointer;transition:box-shadow .2s,transform .2s,border-color .2s}
   .run-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--line-2)}
-
   .run-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
   .run-brand{font-family:var(--disp);font-weight:600;font-size:15px;text-transform:capitalize}
-  .run-topic{color:var(--ink-2);font-size:13.5px;flex:1;min-width:200px;overflow:hidden;
+  .run-topic{color:var(--ink-2);font-size:13.5px;flex:1;min-width:180px;overflow:hidden;
              text-overflow:ellipsis;white-space:nowrap}
   .run-time{font-size:12px;color:var(--ink-3);white-space:nowrap}
   .run-cost{font-family:var(--disp);font-weight:600;font-size:13px;color:var(--teal);white-space:nowrap}
@@ -104,7 +110,7 @@
          padding:4px 11px;border-radius:99px;white-space:nowrap}
   .badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
   .badge.success,.badge.published{background:var(--ok-soft);color:var(--ok)}
-  .badge.failed{background:var(--bad-soft);color:var(--bad)}
+  .badge.failed,.badge.rejected{background:var(--bad-soft);color:var(--bad)}
   .badge.needs_review{background:var(--warn-soft);color:var(--warn)}
   .badge.running,.badge.pending{background:var(--teal-soft);color:var(--teal)}
   .badge.running::before{animation:blink 1s ease-in-out infinite}
@@ -127,8 +133,7 @@
   .step.fail .step-label{color:var(--bad)}
   .step.review .step-icon{background:var(--warn);border-color:var(--warn);color:#fff}
   .step.review .step-label{color:var(--warn)}
-
-  .conn{height:3px;flex:1;min-width:34px;background:var(--line);border-radius:2px;margin:0 10px;
+  .conn{height:3px;flex:1;min-width:30px;background:var(--line);border-radius:2px;margin:0 10px;
         position:relative;overflow:hidden}
   .conn::after{content:'';position:absolute;inset:0;background:var(--ok);border-radius:2px;
                transform:scaleX(0);transform-origin:left;transition:transform .6s cubic-bezier(.2,.7,.3,1)}
@@ -141,11 +146,58 @@
   .run-meta b{color:var(--ink)}
   .run-meta .fail-note{color:var(--bad);font-weight:600}
 
-  .empty{padding:70px 24px;text-align:center;background:var(--card);border:1px dashed var(--line-2);
+  .empty{padding:60px 24px;text-align:center;background:var(--card);border:1px dashed var(--line-2);
          border-radius:16px;color:var(--ink-3)}
   .empty b{display:block;color:var(--ink);font-family:var(--disp);font-size:17px;margin-bottom:6px}
 
-  /* drawer */
+  /* ---------- LIVE ACTIVITY PANEL (signature) ---------- */
+  .panel{position:sticky;top:86px}
+  .panel-card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+              box-shadow:var(--shadow);overflow:hidden}
+  .panel-head{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px}
+  .panel-head h3{font-family:var(--disp);font-size:14px;font-weight:600;flex:1}
+  .panel-head .pulse{width:8px;height:8px;border-radius:50%;background:var(--teal);
+                     animation:blink 1.2s ease-in-out infinite}
+  .panel-head .pulse.idle{background:var(--ink-3);animation:none}
+  .panel-body{padding:16px 18px}
+
+  .panel-idle{text-align:center;color:var(--ink-3);font-size:13px;padding:22px 8px}
+  .panel-idle .big{font-size:30px;margin-bottom:8px;opacity:.55}
+
+  .lp-brand{font-family:var(--disp);font-weight:600;font-size:14px;text-transform:capitalize;margin-bottom:2px}
+  .lp-topic{font-size:12.5px;color:var(--ink-2);margin-bottom:13px;line-height:1.45;
+            display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  .lp-timers{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .lp-timer{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:10px 12px;text-align:center}
+  .lp-timer .tk{font-size:10.5px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+  .lp-timer .tv{font-family:var(--disp);font-size:19px;font-weight:700;margin-top:1px;
+                font-variant-numeric:tabular-nums}
+  .lp-timer.eta .tv{color:var(--teal)}
+
+  .lp-bar{height:7px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:14px}
+  .lp-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--ok));
+           transition:width .7s cubic-bezier(.2,.7,.3,1)}
+
+  .lp-steps{display:flex;flex-direction:column}
+  .lp-step{display:flex;align-items:center;gap:10px;padding:6.5px 0;font-size:12.5px;
+           border-bottom:1px solid var(--line)}
+  .lp-step:last-child{border-bottom:none}
+  .lp-ico{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;
+          font-size:11px;color:#fff;background:var(--line-2)}
+  .lp-step.done .lp-ico{background:var(--ok)}
+  .lp-step.failed .lp-ico{background:var(--bad)}
+  .lp-step.running .lp-ico{background:var(--card);border:2px solid var(--teal);position:relative}
+  .lp-step.running .lp-ico::after{content:'';width:10px;height:10px;border-radius:50%;
+        border:2px solid var(--teal);border-top-color:transparent;animation:spin .8s linear infinite}
+  .lp-name{flex:1;font-weight:500;color:var(--ink-3)}
+  .lp-step.done .lp-name{color:var(--ink)}
+  .lp-step.running .lp-name{color:var(--teal);font-weight:600}
+  .lp-step.failed .lp-name{color:var(--bad)}
+  .lp-dur{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .lp-step.running .lp-dur{color:var(--teal);font-weight:600}
+
+  /* ---------- drawer ---------- */
   .scrim{position:fixed;inset:0;background:rgba(22,35,46,.32);backdrop-filter:blur(2px);
          opacity:0;pointer-events:none;transition:opacity .22s;z-index:20}
   .scrim.open{opacity:1;pointer-events:auto}
@@ -162,39 +214,39 @@
         margin-bottom:16px;box-shadow:var(--shadow)}
   .card h4{font-family:var(--disp);font-size:13px;font-weight:600;color:var(--ink-2);
            text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
-
   .kv{display:grid;grid-template-columns:110px 1fr;gap:8px 14px;font-size:13.5px}
   .kv dt{color:var(--ink-3);font-weight:500}
   .kv dd{word-break:break-word}
-
   .caption-box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
                font-size:13px;white-space:pre-wrap;line-height:1.6;max-height:180px;overflow-y:auto}
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .tag{background:var(--teal-soft);color:var(--teal-deep);font-size:12px;font-weight:500;
-       padding:3px 10px;border-radius:99px}
-
+  .tag{background:var(--teal-soft);color:var(--teal-deep);font-size:12px;font-weight:500;padding:3px 10px;border-radius:99px}
   .score-wrap{display:flex;align-items:center;gap:12px}
   .score-bar{flex:1;height:8px;background:var(--line);border-radius:99px;overflow:hidden}
   .score-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--warn),var(--ok));
               animation:grow .8s cubic-bezier(.2,.7,.3,1) both}
   @keyframes grow{from{width:0}}
   .score-num{font-family:var(--disp);font-weight:700;font-size:16px}
-
-  .thumb{width:100%;max-width:220px;border-radius:12px;border:1px solid var(--line);display:block;
-         box-shadow:var(--shadow)}
+  .thumb{width:100%;max-width:220px;border-radius:12px;border:1px solid var(--line);display:block;box-shadow:var(--shadow)}
   .asset-link{display:inline-flex;align-items:center;gap:7px;color:var(--teal);font-weight:600;
               font-size:13px;text-decoration:none;margin:4px 14px 4px 0}
   .asset-link:hover{text-decoration:underline}
 
+  .approve-bar{display:flex;gap:10px;align-items:center;background:var(--warn-soft);
+               border:1px solid #F2DDB4;border-radius:14px;padding:14px 16px;margin-bottom:16px;flex-wrap:wrap}
+  .approve-bar .msg{flex:1;font-size:13px;color:#7A5310;line-height:1.5;min-width:180px}
+  .approve-bar .msg b{display:block;color:var(--warn);font-size:13.5px}
+
   .tl{position:relative;padding-left:26px}
   .tl::before{content:'';position:absolute;left:9px;top:8px;bottom:8px;width:2px;background:var(--line)}
-  .tl-item{position:relative;padding:8px 0;display:flex;align-items:center;gap:10px;
-           animation:rise .4s ease both}
+  .tl-item{position:relative;padding:8px 0;display:flex;align-items:center;gap:10px;animation:rise .4s ease both}
   .tl-item .node{position:absolute;left:-26px;top:50%;transform:translateY(-50%);width:20px;height:20px;
                  border-radius:50%;display:grid;place-items:center;font-size:11px;color:#fff;background:var(--ink-3)}
   .tl-item.success .node{background:var(--ok)}
   .tl-item.failed .node{background:var(--bad)}
-  .tl-item.needs_review .node{background:var(--warn)}
+  .tl-item.running .node{background:var(--card);border:2px solid var(--teal)}
+  .tl-item.running .node::after{content:'';width:9px;height:9px;border-radius:50%;
+        border:2px solid var(--teal);border-top-color:transparent;animation:spin .8s linear infinite}
   .tl-name{font-weight:600;font-size:13.5px}
   .tl-desc{font-size:12px;color:var(--ink-3)}
   .tl-time{font-size:12px;color:var(--ink-3);white-space:nowrap}
@@ -202,7 +254,6 @@
   .tl-err{margin:2px 0 8px;padding:10px 13px;background:var(--bad-soft);color:#8C2C1F;
           border-radius:9px;font-size:12.5px;line-height:1.5;word-break:break-word}
   .tl-err b{display:block;color:var(--bad);margin-bottom:3px;font-size:12px}
-
   .pub-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
   .pub-row:last-child{border-bottom:none}
   .pub-row .plat{font-weight:600;flex:1;text-transform:capitalize}
@@ -227,10 +278,7 @@
   .field input:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
   .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
 
-  @media (max-width:640px){
-    .step-label-wrap{display:none}
-    .run-topic{white-space:normal}
-  }
+  @media (max-width:640px){.step-label-wrap{display:none}.run-topic{white-space:normal}}
 </style>
 </head>
 <body class="first-load">
@@ -238,22 +286,36 @@
 <header class="rise">
   <div class="logo"><span class="dot"></span>UIC Content Studio <small>AI agents for growth</small></div>
   <div class="spacer"></div>
-  <span class="live"><span class="pulse"></span>Live — updates automatically</span>
+  <span class="live-chip"><span class="pulse"></span>Live — updates automatically</span>
   <button id="refresh" class="ghost">↻ Refresh</button>
   <button id="runBtn" class="primary">+ New post</button>
   <button id="logout" class="ghost">Sign out</button>
 </header>
 
-<main>
-  <div class="alerts" id="alerts"></div>
-  <div class="stats" id="stats"></div>
+<div class="layout">
+  <main>
+    <div class="alerts" id="alerts"></div>
+    <div class="stats" id="stats"></div>
+    <div class="sec-head rise">
+      <h2>Content runs</h2>
+      <span class="sub">Each run is one post's journey from research to publish. Click a card for details.</span>
+    </div>
+    <div class="runs" id="runs"></div>
+  </main>
 
-  <div class="sec-head rise">
-    <h2>Content runs</h2>
-    <span class="sub">Each run is one post's journey from research to publish. Click a card for details.</span>
-  </div>
-  <div class="runs" id="runs"></div>
-</main>
+  <aside class="panel rise">
+    <div class="panel-card">
+      <div class="panel-head">
+        <span class="pulse idle" id="panelPulse"></span>
+        <h3>Live activity</h3>
+        <span class="sub" id="panelCount"></span>
+      </div>
+      <div class="panel-body" id="panelBody">
+        <div class="panel-idle"><div class="big">◎</div>Nothing running right now.<br>Start a new post to watch the agents work live.</div>
+      </div>
+    </div>
+  </aside>
+</div>
 
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" aria-label="Run detail">
@@ -267,7 +329,7 @@
 <div class="modal-scrim" id="modalScrim">
   <div class="modal">
     <h3>Create a new post</h3>
-    <p>Agents will research a topic, create the content, and publish it. Takes 2–5 minutes.</p>
+    <p>Agents will research a topic, create the content, and publish it. Typically takes 3–5 minutes.</p>
     <div class="field">
       <label for="mBrand">Brand</label>
       <select id="mBrand">
@@ -291,7 +353,6 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* Friendly English names + one-line explanation for every agent */
 const AGENT_INFO = {
   trend_agent:            ['Trend research',    'Finds what is relevant right now via web search'],
   competitor_agent:       ['Competitor check',  'Looks at what competitors are posting'],
@@ -315,6 +376,16 @@ const AGENT_INFO = {
   revenue_optimization_agent:['Revenue analysis','Reports what is working and what is not'],
 };
 
+/* Standard order for a content run — used for the live panel step list + ETA */
+const EXPECTED_SEQ = ['trend_agent','competitor_agent','script_agent','caption_agent','hashtag_agent',
+  'image_agent','voice_agent','viral_prediction_agent','thumbnail_agent','subtitle_agent',
+  'video_agent','instagram_publisher'];
+const FALLBACK_AVG_MS = {
+  trend_agent:45000, competitor_agent:2000, script_agent:10000, caption_agent:7000,
+  hashtag_agent:9000, image_agent:65000, voice_agent:12000, viral_prediction_agent:25000,
+  thumbnail_agent:55000, subtitle_agent:60000, video_agent:60000, instagram_publisher:20000,
+};
+
 const STAGE_STEPS = [
   { key:'intelligence', label:'Research', sub:'Trends + competitors', icon:'🔍' },
   { key:'creation',     label:'Create',   sub:'Script, image, video', icon:'✨' },
@@ -331,14 +402,17 @@ function ago(ts){
   if (s<86400) return Math.floor(s/3600)+'h ago';
   return Math.floor(s/86400)+'d ago';
 }
-
+function fmtDur(ms){
+  const s = Math.max(0, Math.round(ms/1000));
+  if (s < 60) return s+'s';
+  return Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s';
+}
 function toast(msg,kind){
   const t=$('toast'); t.textContent=msg; t.className='toast show '+(kind||'');
   setTimeout(()=>t.className='toast '+(kind||''),4000);
 }
-
 function statusLabel(s){
-  return {success:'Complete',published:'Published',failed:'Failed',
+  return {success:'Complete',published:'Published',failed:'Failed',rejected:'Rejected',
           needs_review:'Needs review',running:'Running',pending:'Queued'}[s]||s;
 }
 
@@ -347,7 +421,6 @@ function rail(run){
   const done = run.stage==='done';
   const failed = run.status==='failed';
   const review = run.status==='needs_review';
-
   let html = '<div class="rail">';
   STAGE_STEPS.forEach((s,i)=>{
     let cls='', icon=s.icon;
@@ -367,35 +440,146 @@ function rail(run){
   return html+'</div>';
 }
 
-/* ---------- smart refresh ----------
-   Poll in the background, but ONLY touch the DOM when the data actually
-   changed. This is what stops the page from visibly "refreshing" every
-   few seconds. A fingerprint of the payload is compared; identical -> skip. */
-let statsFp='', runsFp='';
-let firstPaint=true;
+/* ================= LIVE ACTIVITY PANEL ================= */
+let liveState = null;   // { run, agents, avgs } for the newest active run
+let liveFp = '';
+
+async function loadLive(){
+  const r = await fetch('/api/live');
+  if (r.status===401){location.href='/login';return}
+  const d = await r.json();
+
+  const active = d.runs && d.runs[0];
+  const fp = JSON.stringify([active&&active.id, active&&active.stage,
+    (d.agents||[]).map(a=>[a.agent_name,a.status])]);
+  const changed = fp !== liveFp;
+  liveFp = fp;
+
+  if (!active){
+    if (liveState !== null || changed){
+      liveState = null;
+      $('panelPulse').classList.add('idle');
+      $('panelCount').textContent = '';
+      $('panelBody').innerHTML = '<div class="panel-idle"><div class="big">◎</div>'+
+        'Nothing running right now.<br>Start a new post to watch the agents work live.</div>';
+    }
+    return;
+  }
+
+  const agents = (d.agents||[]).filter(a=>a.pipeline_run_id===active.id);
+  liveState = { run:active, agents, avgs:d.avg_durations||{}, configured:d.configured||{} };
+  $('panelPulse').classList.remove('idle');
+  $('panelCount').textContent = d.runs.length>1 ? (d.runs.length-1)+' more queued' : '';
+
+  if (changed) renderLive();   // structure changed -> full redraw
+  tickLive();                  // timers always tick
+}
+
+function activeSeq(){
+  // Hide steps whose integration isn't configured (e.g. video without
+  // Creatomate) — they will never run, so they shouldn't sit in the list
+  // or inflate the ETA.
+  return EXPECTED_SEQ.filter(n =>
+    n !== 'video_agent' || (liveState && liveState.configured && liveState.configured.video));
+}
+
+function renderLive(){
+  if (!liveState) return;
+  const { run, agents } = liveState;
+  const seq = activeSeq();
+  const topic = (run.script&&run.script.hook) ||
+    (run.trend_source&&run.trend_source.trends&&run.trend_source.trends[0]&&run.trend_source.trends[0].topic) || 'Finding a topic…';
+
+  const byName = {};
+  agents.forEach(a=>{ byName[a.agent_name] = a; });
+
+  const doneCount = agents.filter(a=>a.status==='success'||a.status==='failed').length;
+
+  let steps = '';
+  for (const name of seq){
+    const a = byName[name];
+    const info = AGENT_INFO[name] || [name,''];
+    let cls='pending', ico='', dur='';
+    if (a && (a.status==='success')){ cls='done'; ico='✓'; dur=fmtDur(a.duration_ms||0); }
+    else if (a && a.status==='failed'){ cls='failed'; ico='✕'; dur=fmtDur(a.duration_ms||0); }
+    else if (a && a.status==='running'){ cls='running'; ico='';
+      dur='<span data-run-started="'+a.created_at+'">…</span>'; }
+    else { dur='<span style="opacity:.6">~'+fmtDur(avgFor(name))+'</span>'; }
+    steps += '<div class="lp-step '+cls+'"><span class="lp-ico">'+ico+'</span>'+
+      '<span class="lp-name">'+esc(info[0])+'</span><span class="lp-dur">'+dur+'</span></div>';
+  }
+
+  $('panelBody').innerHTML =
+    '<div class="lp-brand">'+esc(run.brand.replace(/_/g,' '))+'</div>'+
+    '<div class="lp-topic">'+esc(topic)+'</div>'+
+    '<div class="lp-timers">'+
+      '<div class="lp-timer"><div class="tk">Elapsed</div>'+
+        '<div class="tv" id="lpElapsed" data-started="'+run.created_at+'">0s</div></div>'+
+      '<div class="lp-timer eta"><div class="tk">Est. remaining</div>'+
+        '<div class="tv" id="lpEta">—</div></div>'+
+    '</div>'+
+    '<div class="lp-bar"><div class="lp-fill" id="lpFill" style="width:'+
+      Math.round(doneCount/seq.length*100)+'%"></div></div>'+
+    '<div class="lp-steps">'+steps+'</div>';
+}
+
+function avgFor(name){
+  const a = liveState && liveState.avgs[name];
+  return (a && a>500) ? a : (FALLBACK_AVG_MS[name]||15000);
+}
+
+/* Ticks every second: elapsed, per-running-agent elapsed, and ETA — updates
+   text in place, never re-renders the panel structure. */
+function tickLive(){
+  if (!liveState) return;
+  const el = $('lpElapsed');
+  if (el) el.textContent = fmtDur(Date.now() - new Date(el.dataset.started));
+
+  document.querySelectorAll('[data-run-started]').forEach(sp=>{
+    sp.textContent = fmtDur(Date.now() - new Date(sp.dataset.runStarted));
+  });
+
+  // ETA = remaining time of currently-running agents + avg of untouched ones
+  const byName = {};
+  liveState.agents.forEach(a=>{ byName[a.agent_name]=a; });
+  let eta = 0;
+  for (const name of activeSeq()){
+    const a = byName[name];
+    if (a && (a.status==='success'||a.status==='failed')) continue;
+    if (a && a.status==='running'){
+      eta += Math.max(2000, avgFor(name) - (Date.now() - new Date(a.created_at)));
+    } else {
+      eta += avgFor(name);
+    }
+  }
+  const etaEl = $('lpEta');
+  if (etaEl) etaEl.textContent = '~'+fmtDur(eta);
+}
+
+/* ================= stats / runs (smart refresh) ================= */
+let statsFp='', runsFp='', alertsFp='';
 
 async function loadStats(){
   const r = await fetch('/api/stats');
   if (r.status===401){location.href='/login';return}
   const s = await r.json();
   const fp = JSON.stringify(s);
-  if (fp===statsFp) return;          // nothing changed -> no re-render
+  if (fp===statsFp) return;
   const prev = statsFp ? JSON.parse(statsFp) : null;
   statsFp = fp;
 
   const items=[
-    ['Total runs',s.total_runs,'',           'total_runs'],
-    ['Published',s.published,'ok',           'published'],
-    ['Needs review',s.needs_review,'warn',   'needs_review'],
-    ['Failed',s.failed,'bad',                'failed'],
-    ['Leads',s.leads,'',                     'leads'],
+    ['Total runs',s.total_runs,'','total_runs'],
+    ['Published',s.published,'ok','published'],
+    ['Needs review',s.needs_review,'warn','needs_review'],
+    ['Failed',s.failed,'bad','failed'],
+    ['Leads',s.leads,'','leads'],
     ['Spend',(s.total_cost!=null?'$'+Number(s.total_cost).toFixed(2):'—'),'teal','total_cost'],
   ];
   $('stats').innerHTML = items.map(([k,v,cls])=>
     '<div class="stat '+cls+' rise"><div class="k">'+k+'</div>'+
     '<div class="v" data-k="'+k+'">'+v+'</div></div>').join('');
-
-  if (prev){ // bump only the numbers that changed
+  if (prev){
     items.forEach(([k,,,key])=>{
       if (String(prev[key])!==String(s[key])){
         const el=document.querySelector('.v[data-k="'+k+'"]');
@@ -405,15 +589,39 @@ async function loadStats(){
   }
 }
 
+const ISSUE_TITLES = {
+  balance:'💳 Out of balance', invalid_key:'🔑 API key problem', missing_key:'🔑 API key missing',
+  rate_limit:'⏳ Rate limited', error:'⚠ Recent errors',
+};
+const ISSUE_ICONS = { balance:'💳', invalid_key:'🔑', missing_key:'🔑', rate_limit:'⏳', error:'⚠' };
+
+async function loadAlerts(){
+  const r = await fetch('/api/service-health');
+  if (r.status===401){location.href='/login';return}
+  const d = await r.json();
+  const fp = JSON.stringify(d.alerts.map(a=>[a.provider,a.issue]));
+  if (fp===alertsFp) return;
+  alertsFp = fp;
+  const el = $('alerts');
+  if (!d.alerts.length){ el.innerHTML=''; return; }
+  el.innerHTML = d.alerts.map(a=>
+    '<div class="alert '+esc(a.issue)+' rise">'+
+      '<div class="alert-icon">'+(ISSUE_ICONS[a.issue]||'⚠')+'</div>'+
+      '<div class="alert-body">'+
+        '<div class="alert-title">'+(ISSUE_TITLES[a.issue]||'Issue')+' — '+esc(a.label)+'</div>'+
+        '<div class="alert-msg">'+esc(a.message)+'</div>'+
+        (a.sample_error?'<div class="alert-detail">'+esc(a.sample_error)+'</div>':'')+
+      '</div>'+
+      '<span class="alert-time">'+ago(a.last_seen)+'</span>'+
+    '</div>').join('');
+}
+
 async function loadRuns(){
   const r = await fetch('/api/runs');
   if (r.status===401){location.href='/login';return}
   const runs = await r.json();
-
-  // Fingerprint ignores created_at-relative text; includes everything that
-  // affects what's drawn. "Xs ago" alone shouldn't trigger a redraw.
   const fp = JSON.stringify(runs.map(x=>[x.id,x.stage,x.status,x.ok_agents,x.failed_agents,x.total_agents,x.cost]));
-  if (fp===runsFp) { updateTimes(runs); return; }
+  if (fp===runsFp) { updateTimes(); return; }
   runsFp = fp;
 
   const el = $('runs');
@@ -422,7 +630,6 @@ async function loadRuns(){
       'Click "New post" — the agents will handle everything from research to publishing.</div>';
     return;
   }
-
   el.innerHTML = runs.map(run=>{
     const topic = (run.script&&run.script.hook) ||
       (run.trend_source&&run.trend_source.trends&&run.trend_source.trends[0]&&run.trend_source.trends[0].topic) || '';
@@ -440,19 +647,15 @@ async function loadRuns(){
       '<div class="run-meta"><span><b>'+(run.ok_agents||0)+'</b> / '+(run.total_agents||0)+
       ' steps complete</span>'+failNote+'</div></div>';
   }).join('');
-
   el.querySelectorAll('.run-card').forEach(c=>
     c.addEventListener('click',()=>openRun(c.dataset.id)));
 }
 
-/* Update only the "Xm ago" text in place — no re-render, no flicker */
 function updateTimes(){
-  document.querySelectorAll('.run-time[data-ts]').forEach(el=>{
-    el.textContent = ago(el.dataset.ts);
-  });
+  document.querySelectorAll('.run-time[data-ts]').forEach(el=>{ el.textContent = ago(el.dataset.ts); });
 }
 
-/* ---------- drawer ---------- */
+/* ================= drawer ================= */
 async function openRun(id){
   const r = await fetch('/api/runs/'+id);
   if (!r.ok) return toast('Could not load that run','err');
@@ -460,8 +663,23 @@ async function openRun(id){
   const run=d.run, a=run.assets||{};
 
   $('dtitle').textContent = run.brand.replace(/_/g,' ');
+  let html = '';
 
-  let html = '<div class="card"><h4>Status</h4>'+rail(run)+
+  if (run.status === 'needs_review') {
+    const canPublish = !!(a.caption_agent&&a.caption_agent.caption) &&
+      !!((a.video_agent&&a.video_agent.video_url)||(a.image_agent&&a.image_agent.image_urls&&a.image_agent.image_urls.length));
+    if (canPublish) {
+      html += '<div class="approve-bar"><div class="msg"><b>Waiting for your approval</b>'+
+        'Some steps failed, but the caption and media are ready. Review the content below, then publish or reject.</div>'+
+        '<button class="reject" id="btnReject">Reject</button>'+
+        '<button class="approve" id="btnApprove">Approve & Publish</button></div>';
+    } else {
+      html += '<div class="approve-bar"><div class="msg"><b>Cannot publish this run</b>'+
+        'The caption or media was never generated. Fix the failed steps below and start a new run.</div></div>';
+    }
+  }
+
+  html += '<div class="card"><h4>Status</h4>'+rail(run)+
     '<div class="kv" style="margin-top:16px">'+
     '<dt>Status</dt><dd><span class="badge '+esc(run.status)+'">'+statusLabel(run.status)+'</span></dd>'+
     '<dt>Started</dt><dd>'+new Date(run.created_at).toLocaleString('en-IN')+'</dd>'+
@@ -514,12 +732,12 @@ async function openRun(id){
   html += '<div class="card"><h4>Step-by-step breakdown</h4><div class="tl">';
   html += d.agents.map((ag,i)=>{
     const info = AGENT_INFO[ag.agent_name]||[ag.agent_name,''];
-    const icon = ag.status==='success'?'✓':ag.status==='failed'?'✕':'!';
+    const icon = ag.status==='success'?'✓':ag.status==='failed'?'✕':ag.status==='running'?'':'!';
     let row = '<div class="tl-item '+esc(ag.status)+'" style="animation-delay:'+(i*0.045)+'s">'+
       '<span class="node">'+icon+'</span>'+
       '<div style="flex:1"><div class="tl-name">'+esc(info[0])+'</div>'+
       '<div class="tl-desc">'+esc(info[1])+'</div></div>'+
-      '<span class="tl-time">'+((ag.duration_ms||0)/1000).toFixed(1)+'s</span>'+
+      '<span class="tl-time">'+(ag.status==='running'?'running…':((ag.duration_ms||0)/1000).toFixed(1)+'s')+'</span>'+
       '<span class="tl-cost">$'+Number(ag.cost_usd||0).toFixed(3)+'</span></div>';
     if (ag.error) row += '<div class="tl-err"><b>What went wrong:</b>'+esc(friendlyError(ag.error))+'</div>';
     return row;
@@ -529,12 +747,40 @@ async function openRun(id){
   $('dbody').innerHTML=html;
   $('drawer').classList.add('open');
   $('scrim').classList.add('open');
+
+  const btnA = document.getElementById('btnApprove');
+  const btnR = document.getElementById('btnReject');
+  if (btnA) btnA.onclick = async () => {
+    if (!confirm('Publish this post to Instagram now?')) return;
+    btnA.disabled = true; btnA.textContent = 'Publishing…';
+    try {
+      const r2 = await fetch('/pipeline/'+id+'/approve', { method:'POST' });
+      const d2 = await r2.json();
+      if (!r2.ok) throw new Error(d2.error || 'Publish failed');
+      toast('Published! Open the run to see the post link.','ok');
+      closeDrawer(); statsFp='';runsFp='';loadAll();
+    } catch(e){
+      toast(e.message,'err');
+      btnA.disabled = false; btnA.textContent = 'Approve & Publish';
+    }
+  };
+  if (btnR) btnR.onclick = async () => {
+    if (!confirm('Reject this run? It will never be published.')) return;
+    btnR.disabled = true;
+    try {
+      const r2 = await fetch('/pipeline/'+id+'/reject', { method:'POST' });
+      if (!r2.ok) throw new Error((await r2.json()).error || 'Reject failed');
+      toast('Run rejected.','ok');
+      closeDrawer(); statsFp='';runsFp='';loadAll();
+    } catch(e){ toast(e.message,'err'); btnR.disabled = false; }
+  };
 }
 
-/* Translate raw API errors into plain instructions where the pattern is known */
 function friendlyError(err){
   if (/billing.hard.limit|billing_limit/i.test(err))
     return 'OpenAI billing limit reached. Go to platform.openai.com → Settings → Limits and raise the monthly limit. ('+err.slice(0,110)+'…)';
+  if (/moderation_blocked|safety/i.test(err))
+    return 'The AI image safety filter blocked this prompt (a false positive that can happen with medical topics). The system retries automatically with a safer prompt. ('+err.slice(0,90)+'…)';
   if (/not set/i.test(err))
     return err+' — add this key in Render → Environment.';
   if (/401|invalid.*key|authentication/i.test(err))
@@ -546,13 +792,11 @@ function friendlyError(err){
 
 function drawerOpen(){return $('drawer').classList.contains('open')}
 function modalOpen(){return $('modalScrim').classList.contains('open')}
-
 function closeDrawer(){$('drawer').classList.remove('open');$('scrim').classList.remove('open')}
 $('dclose').onclick=closeDrawer;
 $('scrim').onclick=closeDrawer;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();$('modalScrim').classList.remove('open')}});
 
-/* ---------- new post modal ---------- */
 $('runBtn').onclick=()=>$('modalScrim').classList.add('open');
 $('mCancel').onclick=()=>$('modalScrim').classList.remove('open');
 $('modalScrim').addEventListener('click',e=>{if(e.target===$('modalScrim'))$('modalScrim').classList.remove('open')});
@@ -567,65 +811,26 @@ $('mGo').onclick=async()=>{
       headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(!r.ok) throw new Error((await r.json()).error||'Could not start');
     $('modalScrim').classList.remove('open');
-    toast('Pipeline started — takes 2–5 minutes. The board updates on its own.','ok');
-    setTimeout(loadAll,1200);
+    toast('Pipeline started — watch it live in the activity panel.','ok');
+    setTimeout(()=>{loadAll();loadLive()},1200);
   }catch(e){toast(e.message,'err')}
   finally{btn.disabled=false;btn.textContent='Start'}
 };
 
-$('refresh').onclick=()=>{statsFp='';runsFp='';loadAll();toast('Refreshed','ok')};
+$('refresh').onclick=()=>{statsFp='';runsFp='';alertsFp='';liveFp='';loadAll();loadLive();toast('Refreshed','ok')};
 $('logout').onclick=async()=>{await fetch('/logout',{method:'POST'});location.href='/login'};
-
-/* ---------- service health alerts ----------
-   "Kaunsi API ka balance khatam hua" — provider-level rollup of recent
-   failures, most severe (balance) first. Same fingerprint trick: no DOM
-   churn unless something actually changed. */
-let alertsFp='';
-const ISSUE_TITLES = {
-  balance:     '💳 Balance khatam',
-  invalid_key: '🔑 API key problem',
-  missing_key: '🔑 API key missing',
-  rate_limit:  '⏳ Rate limit',
-  error:       '⚠ Errors aa rahe hain',
-};
-const ISSUE_ICONS = { balance:'💳', invalid_key:'🔑', missing_key:'🔑', rate_limit:'⏳', error:'⚠' };
-
-async function loadAlerts(){
-  const r = await fetch('/api/service-health');
-  if (r.status===401){location.href='/login';return}
-  const d = await r.json();
-  const fp = JSON.stringify(d.alerts.map(a=>[a.provider,a.issue]));
-  if (fp===alertsFp) return;
-  alertsFp = fp;
-
-  const el = $('alerts');
-  if (!d.alerts.length){ el.innerHTML=''; return; }
-
-  el.innerHTML = d.alerts.map(a=>
-    '<div class="alert '+esc(a.issue)+' rise">'+
-      '<div class="alert-icon">'+(ISSUE_ICONS[a.issue]||'⚠')+'</div>'+
-      '<div class="alert-body">'+
-        '<div class="alert-title">'+(ISSUE_TITLES[a.issue]||'Issue')+' — '+esc(a.label)+'</div>'+
-        '<div class="alert-msg">'+esc(a.message)+'</div>'+
-        (a.sample_error?'<div class="alert-detail">'+esc(a.sample_error)+'</div>':'')+
-      '</div>'+
-      '<span class="alert-time">'+ago(a.last_seen)+'</span>'+
-    '</div>').join('');
-}
 
 function loadAll(){loadAlerts();loadStats();loadRuns()}
 
-loadAll().then?.(()=>{});
-/* entrance animations only once — after first paint, new renders appear without replaying them */
+loadAll(); loadLive();
 setTimeout(()=>document.body.classList.remove('first-load'),900);
 
-/* Background poll: skips DOM work when nothing changed, and pauses entirely
-   while the drawer or modal is open so nothing moves under the user. */
-setInterval(()=>{
-  if (document.hidden || drawerOpen() || modalOpen()) return;
-  loadAll();
-},8000);
-/* Relative times tick every 30s without any re-render */
+/* Main data: 8s poll, skipped when hidden/drawer/modal open. */
+setInterval(()=>{ if (document.hidden || drawerOpen() || modalOpen()) return; loadAll(); },8000);
+/* Live panel: faster 3s poll (only cheap /api/live), still skips when hidden. */
+setInterval(()=>{ if (document.hidden) return; loadLive(); },3000);
+/* Timers tick every second, in place — no re-render. */
+setInterval(()=>{ tickLive(); },1000);
 setInterval(updateTimes,30000);
 </script>
 </body>

@@ -46,4 +46,28 @@ async function logAgentRun({ pipelineRunId, agentName, input, output, status, co
   );
 }
 
-module.exports = { pool, query, createPipelineRun, updatePipelineStage, logAgentRun };
+/**
+ * Insert a 'running' row the moment an agent starts, so the dashboard can show
+ * live "what is executing right now". Returns the row id for completeAgentRun.
+ */
+async function markAgentRunning({ pipelineRunId, agentName, input }) {
+  const res = await query(
+    `INSERT INTO agent_runs (pipeline_run_id, agent_name, input, status)
+     VALUES ($1, $2, $3, 'running') RETURNING id`,
+    [pipelineRunId, agentName, input ? JSON.stringify(input) : null]
+  );
+  return res.rows[0].id;
+}
+
+/** Update the 'running' row with the final result once the agent finishes. */
+async function completeAgentRun({ id, output, status, confidence, costUsd, durationMs, error }) {
+  await query(
+    `UPDATE agent_runs
+     SET output = $1, status = $2, confidence = $3, cost_usd = $4, duration_ms = $5, error = $6
+     WHERE id = $7`,
+    [output ? JSON.stringify(output) : null, status, confidence ?? null,
+      costUsd ?? 0, durationMs ?? null, error ?? null, id]
+  );
+}
+
+module.exports = { pool, query, createPipelineRun, updatePipelineStage, logAgentRun, markAgentRunning, completeAgentRun };

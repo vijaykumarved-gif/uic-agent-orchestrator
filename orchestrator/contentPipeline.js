@@ -114,7 +114,14 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel' }
   for (const r of p2) assets[r.agent] = r.output;
 
   // --- Phase 3: video needs image + voice + subtitles ---
-  if (format === 'reel' && audioUrl && imageUrls.length) {
+  // If Creatomate isn't configured at all, SKIP video rather than running the
+  // agent into a guaranteed failure — a missing optional integration should
+  // not force every run into needs_review. The post simply ships as an image.
+  const videoConfigured = !!process.env.CREATOMATE_API_KEY;
+  if (format === 'reel' && !videoConfigured) {
+    console.log('[contentPipeline] CREATOMATE_API_KEY not set — skipping video, will publish as image post');
+  }
+  if (format === 'reel' && videoConfigured && audioUrl && imageUrls.length) {
     const phase3 = await flowProducer.add(
       job(
         'video_agent',
@@ -131,7 +138,7 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel' }
     const videoResult = await waitForJob(phase3.job);
     results.push(videoResult);
     assets[videoResult.agent] = videoResult.output;
-  } else if (format === 'reel') {
+  } else if (format === 'reel' && videoConfigured) {
     console.warn('[contentPipeline] skipping video_agent — missing image or audio');
   }
 
@@ -277,4 +284,41 @@ async function waitForFlowChildren(parentBullJob, timeoutMs = 180000) {
   return Object.values(values || {});
 }
 
-module.exports = { runContentPipeline };
+/**
+ * Approve a run stuck in needs_review and push it through distribution.
+ * Called from the dashboard's "Approve & Publish" button. Publishes with
+ * whatever assets exist — a run held back by a failed thumbnail can still go
+ * out as an image post; only a missing caption or missing ALL media blocks it.
+ */
+async function approvePipelineRun(pipelineRunId) {
+  const res = await query('SELECT * FROM content_pipeline_runs WHERE id = $1', [pipelineRunId]);
+  if (!res.rows.length) throw new Error('Run not found');
+  const run = res.rows[0];
+
+  if (run.status !== 'needs_review') {
+    throw new Error(`Run is "${run.status}", not "needs_review" — nothing to approve.`);
+  }
+
+  const script = run.script;
+  const assets = run.assets || {};
+
+  if (!assets.caption_agent?.caption) {
+    throw new Error('Cannot publish: the caption was never generated. Re-run the pipeline instead.');
+  }
+  const hasMedia = assets.video_agent?.video_url || assets.image_agent?.image_urls?.length;
+  if (!hasMedia) {
+    throw new Error('Cannot publish: no image or video was generated. Re-run the pipeline instead.');
+  }
+
+  const platforms = run.platforms_targeted?.length ? run.platforms_targeted : ['instagram'];
+  const publishResults = await runDistributionStage(pipelineRunId, {
+    brand: run.brand,
+    script,
+    assets,
+    platforms,
+  });
+
+  return { pipelineRunId, status: 'published', publishResults };
+}
+
+module.exports = { runContentPipeline, approvePipelineRun };

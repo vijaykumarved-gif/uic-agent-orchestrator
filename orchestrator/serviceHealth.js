@@ -69,11 +69,11 @@ const ISSUE_PATTERNS = [
 const SEVERITY = { balance: 4, invalid_key: 3, missing_key: 2, rate_limit: 1, error: 0 };
 
 const ISSUE_MESSAGES = {
-  balance:     (p) => `${PROVIDER_LABELS[p]} — balance/credits khatam. Recharge: ${PROVIDER_FIX_URLS[p]}`,
-  invalid_key: (p) => `${PROVIDER_LABELS[p]} — API key invalid ya expired hai. Check: ${PROVIDER_FIX_URLS[p]}, then update it in Render → Environment.`,
-  missing_key: (p) => `${PROVIDER_LABELS[p]} — API key Render → Environment me set nahi hai.`,
-  rate_limit:  (p) => `${PROVIDER_LABELS[p]} — rate limit hit hua hai. Thodi der me khud theek ho jayega.`,
-  error:       (p) => `${PROVIDER_LABELS[p]} — recent runs me errors aa rahe hain.`,
+  balance:     (p) => `${PROVIDER_LABELS[p]} is out of credits/balance. Recharge at: ${PROVIDER_FIX_URLS[p]}`,
+  invalid_key: (p) => `${PROVIDER_LABELS[p]} API key is invalid or expired. Check: ${PROVIDER_FIX_URLS[p]}, then update it in Render → Environment.`,
+  missing_key: (p) => `${PROVIDER_LABELS[p]} API key is not set in Render → Environment.`,
+  rate_limit:  (p) => `${PROVIDER_LABELS[p]} hit a rate limit. This usually recovers on its own shortly.`,
+  error:       (p) => `${PROVIDER_LABELS[p]} is failing in recent runs.`,
 };
 
 function classify(errText) {

@@ -22,6 +22,44 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------- Dashboard API ----------------
 
+// Live activity: active runs, their agent statuses (including 'running' rows),
+// and historical average durations per agent so the UI can estimate time left.
+app.get('/api/live', async (req, res, next) => {
+  try {
+    const runs = await query(
+      `SELECT id, brand, stage, status, script, trend_source, created_at
+       FROM content_pipeline_runs
+       WHERE status IN ('pending','running')
+       ORDER BY created_at DESC LIMIT 3`
+    );
+
+    let agents = [];
+    if (runs.rows.length) {
+      const ids = runs.rows.map((r) => r.id);
+      const ar = await query(
+        `SELECT pipeline_run_id, agent_name, status, duration_ms, created_at
+         FROM agent_runs WHERE pipeline_run_id = ANY($1) ORDER BY created_at`,
+        [ids]
+      );
+      agents = ar.rows;
+    }
+
+    // Successful historical durations -> per-agent averages for ETA math.
+    const avg = await query(
+      `SELECT agent_name, ROUND(AVG(duration_ms)) AS avg_ms
+       FROM agent_runs WHERE status = 'success' AND duration_ms IS NOT NULL
+       GROUP BY agent_name`
+    );
+    const avg_durations = Object.fromEntries(avg.rows.map((r) => [r.agent_name, Number(r.avg_ms)]));
+
+    res.json({
+      runs: runs.rows, agents, avg_durations,
+      configured: { video: !!process.env.CREATOMATE_API_KEY },
+      now: new Date().toISOString(),
+    });
+  } catch (err) { next(err); }
+});
+
 // Rolls up recent agent failures into per-provider alerts ("OpenAI balance
 // khatam") so users don't have to diagnose raw errors run-by-run.
 app.get('/api/service-health', async (req, res, next) => {
@@ -88,6 +126,30 @@ app.get('/api/runs/:id', async (req, res, next) => {
 });
 
 // ---------------- Pipeline ----------------
+
+// Approve a needs_review run -> publish it now with whatever assets exist.
+app.post('/pipeline/:id/approve', async (req, res, next) => {
+  try {
+    const { approvePipelineRun } = require('./orchestrator/contentPipeline');
+    const result = await approvePipelineRun(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Reject a needs_review run -> mark rejected, never publishes.
+app.post('/pipeline/:id/reject', async (req, res, next) => {
+  try {
+    const r = await query(
+      `UPDATE content_pipeline_runs SET status = 'rejected', updated_at = now()
+       WHERE id = $1 AND status = 'needs_review' RETURNING id`,
+      [req.params.id]
+    );
+    if (!r.rows.length) return res.status(400).json({ error: 'Run not found or not in needs_review' });
+    res.json({ id: req.params.id, status: 'rejected' });
+  } catch (err) { next(err); }
+});
 
 app.post('/pipeline/run', async (req, res, next) => {
   try {
