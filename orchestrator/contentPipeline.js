@@ -14,6 +14,16 @@ const { createPipelineRun, updatePipelineStage, query } = require('../db/db');
  * Call runContentPipeline({ brand, topic, platforms }) to kick off a full run.
  */
 
+/**
+ * Cancellation: the dashboard's Stop button sets status='cancelled' in the DB.
+ * The pipeline checks this between stages/phases — agents already in flight
+ * finish, but nothing further is dispatched.
+ */
+async function isCancelled(pipelineRunId) {
+  const r = await query(`SELECT status FROM content_pipeline_runs WHERE id = $1`, [pipelineRunId]);
+  return r.rows[0]?.status === 'cancelled';
+}
+
 function job(agentName, input, context) {
   return { name: agentName, queueName: AGENT_QUEUE_NAME, data: { input, context } };
 }
@@ -83,8 +93,11 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel' }
     children: [
       job('caption_agent', { brand, script }, { pipelineRunId }),
       job('hashtag_agent', { brand, topic }, { pipelineRunId }),
-      job('image_agent', { brand, prompt: script.hook }, { pipelineRunId }),
-      job('voice_agent', { script_text: script.full_script, language }, { pipelineRunId }),
+      job('image_agent', { brand, script, prompt: script.hook }, { pipelineRunId }),
+      // Voiceover only matters for video posts — an image post doesn't need it.
+      ...(format === 'reel'
+        ? [job('voice_agent', { script_text: script.full_script, language }, { pipelineRunId })]
+        : []),
       job('viral_prediction_agent', { script: script.full_script, format }, { pipelineRunId }),
     ],
   });
@@ -92,34 +105,39 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel' }
   results.push(...p1);
   for (const r of p1) assets[r.agent] = r.output;
 
+  if (await isCancelled(pipelineRunId)) return { script, assets, needsReview: false, cancelled: true };
+
   // --- Phase 2: needs Phase 1 outputs (audio for subtitles, image for thumbnail) ---
   const audioUrl = assets.voice_agent?.audio_url;
   const imageUrls = assets.image_agent?.image_urls || [];
 
-  const phase2Children = [job('thumbnail_agent', { script, brand, format }, { pipelineRunId })];
-  if (audioUrl) {
+  const phase2Children = [];
+  if (format === 'reel') phase2Children.push(job('thumbnail_agent', { script, brand, format }, { pipelineRunId }));
+  if (format === 'reel' && audioUrl) {
     phase2Children.push(job('subtitle_agent', { audio_url: audioUrl, language }, { pipelineRunId }));
   } else {
     console.warn('[contentPipeline] voice_agent produced no audio_url — skipping subtitle_agent');
   }
 
-  const phase2 = await flowProducer.add({
-    name: '__stage_root__',
-    queueName: AGENT_QUEUE_NAME,
-    data: { input: {}, context: { pipelineRunId } },
-    children: phase2Children,
-  });
-  const p2 = await waitForFlowChildren(phase2.job);
-  results.push(...p2);
-  for (const r of p2) assets[r.agent] = r.output;
+  if (phase2Children.length) {
+    const phase2 = await flowProducer.add({
+      name: '__stage_root__',
+      queueName: AGENT_QUEUE_NAME,
+      data: { input: {}, context: { pipelineRunId } },
+      children: phase2Children,
+    });
+    const p2 = await waitForFlowChildren(phase2.job);
+    results.push(...p2);
+    for (const r of p2) assets[r.agent] = r.output;
+  }
 
   // --- Phase 3: video needs image + voice + subtitles ---
   // If Creatomate isn't configured at all, SKIP video rather than running the
   // agent into a guaranteed failure — a missing optional integration should
   // not force every run into needs_review. The post simply ships as an image.
-  const videoConfigured = !!process.env.CREATOMATE_API_KEY;
+  const videoConfigured = !!(process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY);
   if (format === 'reel' && !videoConfigured) {
-    console.log('[contentPipeline] CREATOMATE_API_KEY not set — skipping video, will publish as image post');
+    console.log('[contentPipeline] no video provider configured (HEYGEN_API_KEY / CREATOMATE_API_KEY) — publishing as image post');
   }
   if (format === 'reel' && videoConfigured && audioUrl && imageUrls.length) {
     const phase3 = await flowProducer.add(
@@ -241,14 +259,19 @@ async function runDistributionStage(pipelineRunId, { brand, script, assets, plat
 
 /** Full pipeline entry point */
 async function runContentPipeline({ brand, topic, region = 'Ahmedabad', platforms = ['instagram'], format = 'reel' }) {
-  const pipelineRunId = await createPipelineRun({ brand, platformsTargeted: platforms });
+  const pipelineRunId = await createPipelineRun({ brand, platformsTargeted: platforms, format });
 
   const { trend_source } = await runIntelligenceStage(pipelineRunId, { brand, region });
+
+  if (await isCancelled(pipelineRunId)) return { pipelineRunId, status: 'cancelled' };
+
   const { script, assets, needsReview } = await runCreationStage(pipelineRunId, {
     brand,
     topic: topic || trend_source?.trends?.[0]?.topic || 'general health awareness',
     format,
   });
+
+  if (await isCancelled(pipelineRunId)) return { pipelineRunId, status: 'cancelled' };
 
   if (needsReview) {
     // Stop here — a human should approve low-scoring content before it publishes.

@@ -62,3 +62,6 @@ CREATE TABLE IF NOT EXISTS leads (
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_brand_stage ON content_pipeline_runs(brand, stage);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_pipeline ON agent_runs(pipeline_run_id);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+
+-- v13: post format per run ('reel' = avatar/slideshow video, 'image' = static post)
+ALTER TABLE content_pipeline_runs ADD COLUMN IF NOT EXISTS format TEXT DEFAULT 'reel';

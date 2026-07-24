@@ -277,6 +277,17 @@
         padding:10px 12px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--card)}
   .field input:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
   .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+  .fmt-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .fmt-opt input{position:absolute;opacity:0}
+  .fmt-card{display:block;border:2px solid var(--line-2);border-radius:12px;padding:12px;cursor:pointer;
+            transition:border-color .15s,background .15s;height:100%}
+  .fmt-card b{display:block;font-size:13.5px;margin:4px 0 2px}
+  .fmt-card small{color:var(--ink-3);font-size:11.5px;line-height:1.4;display:block}
+  .fmt-ico{font-size:18px}
+  .fmt-opt input:checked + .fmt-card{border-color:var(--teal);background:var(--teal-soft)}
+  .badge.cancelled{background:var(--bg);color:var(--ink-3)}
+  button.stop{background:var(--card);border-color:var(--line-2);color:var(--bad);font-size:12px;padding:6px 12px}
+  button.stop:hover{border-color:var(--bad)}
 
   @media (max-width:640px){.step-label-wrap{display:none}.run-topic{white-space:normal}}
 </style>
@@ -338,6 +349,17 @@
         <option value="airmed_patholab">Airmed Patholab</option>
         <option value="urja_diagnostics">Urja Diagnostics</option>
       </select>
+    </div>
+    <div class="field">
+      <label>Post type</label>
+      <div class="fmt-row">
+        <label class="fmt-opt"><input type="radio" name="mFormat" value="image" checked>
+          <span class="fmt-card"><span class="fmt-ico">🖼</span><b>Image post</b>
+          <small>Ad-style image + caption. Fast (~2 min), low cost.</small></span></label>
+        <label class="fmt-opt"><input type="radio" name="mFormat" value="reel">
+          <span class="fmt-card"><span class="fmt-ico">🎬</span><b>Avatar video</b>
+          <small>AI presenter speaks the script. ~6–10 min, HD reel.</small></span></label>
+      </div>
     </div>
     <div class="field">
       <label for="mTopic">Topic <span style="font-weight:400;color:var(--ink-3)">(leave empty — Trend Agent will pick one)</span></label>
@@ -412,7 +434,7 @@ function toast(msg,kind){
   setTimeout(()=>t.className='toast '+(kind||''),4000);
 }
 function statusLabel(s){
-  return {success:'Complete',published:'Published',failed:'Failed',rejected:'Rejected',
+  return {success:'Complete',published:'Published',failed:'Failed',rejected:'Rejected',cancelled:'Stopped',
           needs_review:'Needs review',running:'Running',pending:'Queued'}[s]||s;
 }
 
@@ -476,11 +498,14 @@ async function loadLive(){
 }
 
 function activeSeq(){
-  // Hide steps whose integration isn't configured (e.g. video without
-  // Creatomate) — they will never run, so they shouldn't sit in the list
-  // or inflate the ETA.
-  return EXPECTED_SEQ.filter(n =>
-    n !== 'video_agent' || (liveState && liveState.configured && liveState.configured.video));
+  // Hide steps that won't run: unconfigured integrations, and for IMAGE posts
+  // the whole audio/video chain (voice, subtitles, thumbnail, video).
+  const fmt = liveState && liveState.run && liveState.run.format;
+  return EXPECTED_SEQ.filter(n => {
+    if (fmt === 'image' && ['voice_agent','subtitle_agent','thumbnail_agent','video_agent'].includes(n)) return false;
+    if (n === 'video_agent' && !(liveState && liveState.configured && liveState.configured.video)) return false;
+    return true;
+  });
 }
 
 function renderLive(){
@@ -642,6 +667,8 @@ async function loadRuns(){
         '<span class="run-topic">'+esc(topic)+'</span>'+
         '<span class="run-cost">$'+Number(run.cost||0).toFixed(3)+'</span>'+
         '<span class="run-time" data-ts="'+run.created_at+'">'+ago(run.created_at)+'</span>'+
+        ((run.status==='running'||run.status==='pending')
+          ? '<button class="stop" data-stop="'+run.id+'">■ Stop</button>' : '')+
       '</div>'+
       rail(run)+
       '<div class="run-meta"><span><b>'+(run.ok_agents||0)+'</b> / '+(run.total_agents||0)+
@@ -649,6 +676,18 @@ async function loadRuns(){
   }).join('');
   el.querySelectorAll('.run-card').forEach(c=>
     c.addEventListener('click',()=>openRun(c.dataset.id)));
+  el.querySelectorAll('button[data-stop]').forEach(b=>
+    b.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      if (!confirm('Stop this run? Nothing will be published.')) return;
+      b.disabled = true;
+      try{
+        const r = await fetch('/pipeline/'+b.dataset.stop+'/cancel',{method:'POST'});
+        if(!r.ok) throw new Error((await r.json()).error||'Could not stop');
+        toast('Run stopped.','ok');
+        statsFp='';runsFp='';liveFp='';loadAll();loadLive();
+      }catch(err){toast(err.message,'err');b.disabled=false}
+    }));
 }
 
 function updateTimes(){
@@ -664,6 +703,13 @@ async function openRun(id){
 
   $('dtitle').textContent = run.brand.replace(/_/g,' ');
   let html = '';
+
+  if (run.status === 'running' || run.status === 'pending') {
+    html += '<div class="approve-bar" style="background:var(--teal-soft);border-color:#CDE8EA">'+
+      '<div class="msg" style="color:var(--teal-deep)"><b style="color:var(--teal)">Run in progress</b>'+
+      'Agents are working. You can stop it — nothing will be published.</div>'+
+      '<button class="stop" id="btnStopRun">■ Stop run</button></div>';
+  }
 
   if (run.status === 'needs_review') {
     const canPublish = !!(a.caption_agent&&a.caption_agent.caption) &&
@@ -764,6 +810,17 @@ async function openRun(id){
       btnA.disabled = false; btnA.textContent = 'Approve & Publish';
     }
   };
+  const btnS = document.getElementById('btnStopRun');
+  if (btnS) btnS.onclick = async () => {
+    if (!confirm('Stop this run? Nothing will be published.')) return;
+    btnS.disabled = true;
+    try {
+      const r2 = await fetch('/pipeline/'+id+'/cancel', { method:'POST' });
+      if (!r2.ok) throw new Error((await r2.json()).error || 'Could not stop');
+      toast('Run stopped.','ok');
+      closeDrawer(); statsFp='';runsFp='';liveFp='';loadAll();loadLive();
+    } catch(e){ toast(e.message,'err'); btnS.disabled = false; }
+  };
   if (btnR) btnR.onclick = async () => {
     if (!confirm('Reject this run? It will never be published.')) return;
     btnR.disabled = true;
@@ -804,7 +861,8 @@ $('modalScrim').addEventListener('click',e=>{if(e.target===$('modalScrim'))$('mo
 $('mGo').onclick=async()=>{
   const btn=$('mGo'); btn.disabled=true; btn.textContent='Starting…';
   try{
-    const body={brand:$('mBrand').value,platforms:['instagram']};
+    const fmt=(document.querySelector('input[name="mFormat"]:checked')||{}).value||'image';
+    const body={brand:$('mBrand').value,platforms:['instagram'],format:fmt};
     const topic=$('mTopic').value.trim();
     if (topic) body.topic=topic;
     const r=await fetch('/pipeline/run',{method:'POST',

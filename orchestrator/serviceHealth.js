@@ -23,7 +23,7 @@ const AGENT_PROVIDER = {
   trend_agent: 'claude',
   lead_qualification_agent: 'claude',
   revenue_optimization_agent: 'claude',
-  video_agent: 'creatomate',
+  video_agent: 'video',
   instagram_publisher: 'meta',
   facebook_publisher: 'meta',
   competitor_agent: 'meta',
@@ -37,7 +37,7 @@ const PROVIDER_LABELS = {
   openai: 'OpenAI (images + subtitles)',
   elevenlabs: 'ElevenLabs (voiceover)',
   claude: 'Claude (scripts + captions)',
-  creatomate: 'Creatomate (video)',
+  video: 'Video generation (HeyGen / Creatomate)',
   meta: 'Meta / Instagram',
   youtube: 'YouTube',
   linkedin: 'LinkedIn',
@@ -50,7 +50,7 @@ const PROVIDER_FIX_URLS = {
   openai: 'platform.openai.com → Settings → Billing / Limits',
   elevenlabs: 'elevenlabs.io → Subscription',
   claude: 'console.anthropic.com → Billing',
-  creatomate: 'creatomate.com → Billing',
+  video: 'heygen.com or creatomate.com → Billing',
   meta: 'business.facebook.com (token may have expired)',
   youtube: 'Google Cloud Console → OAuth credentials',
   linkedin: 'linkedin.com/developers (token may have expired)',
@@ -67,6 +67,28 @@ const ISSUE_PATTERNS = [
 ];
 
 const SEVERITY = { balance: 4, invalid_key: 3, missing_key: 2, rate_limit: 1, error: 0 };
+
+// Which env var(s) satisfy each provider — used to auto-clear "missing key"
+// alerts the moment the key is actually added (no need to wait for a new run).
+const PROVIDER_ENV = {
+  openai: ['OPENAI_API_KEY'],
+  elevenlabs: ['ELEVENLABS_API_KEY'],
+  claude: ['CLAUDE_API_KEY'],
+  
+  meta: ['META_GRAPH_API_TOKEN'],
+  youtube: ['YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REFRESH_TOKEN'],
+  linkedin: ['LINKEDIN_ACCESS_TOKEN'],
+  wati: ['WATI_API_KEY'],
+  cloudinary: ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'],
+};
+
+function envNowSet(provider) {
+  // Video is satisfied by EITHER provider's key.
+  if (provider === 'video') return !!(process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY);
+  const vars = PROVIDER_ENV[provider];
+  if (!vars) return false;
+  return vars.every((v) => !!process.env[v]);
+}
 
 const ISSUE_MESSAGES = {
   balance:     (p) => `${PROVIDER_LABELS[p]} is out of credits/balance. Recharge at: ${PROVIDER_FIX_URLS[p]}`,
@@ -140,6 +162,10 @@ async function getServiceHealth() {
         top = { issue, sample: f };
       }
     }
+
+    // "Missing key" resolves itself the moment the key is added to the
+    // environment — no need to wait for the next run to prove it.
+    if (top.issue === 'missing_key' && envNowSet(provider)) continue;
 
     alerts.push({
       provider,

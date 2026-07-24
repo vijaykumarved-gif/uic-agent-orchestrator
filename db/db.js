@@ -10,11 +10,11 @@ async function query(text, params) {
 }
 
 /** Create a new pipeline run row, returns its id */
-async function createPipelineRun({ brand, platformsTargeted = [] }) {
+async function createPipelineRun({ brand, platformsTargeted = [], format = 'reel' }) {
   const res = await query(
-    `INSERT INTO content_pipeline_runs (brand, platforms_targeted, stage, status)
-     VALUES ($1, $2, 'queued', 'pending') RETURNING id`,
-    [brand, platformsTargeted]
+    `INSERT INTO content_pipeline_runs (brand, platforms_targeted, format, stage, status)
+     VALUES ($1, $2, $3, 'queued', 'pending') RETURNING id`,
+    [brand, platformsTargeted, format]
   );
   return res.rows[0].id;
 }

@@ -27,7 +27,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/live', async (req, res, next) => {
   try {
     const runs = await query(
-      `SELECT id, brand, stage, status, script, trend_source, created_at
+      `SELECT id, brand, stage, status, script, trend_source, format, created_at
        FROM content_pipeline_runs
        WHERE status IN ('pending','running')
        ORDER BY created_at DESC LIMIT 3`
@@ -54,7 +54,7 @@ app.get('/api/live', async (req, res, next) => {
 
     res.json({
       runs: runs.rows, agents, avg_durations,
-      configured: { video: !!process.env.CREATOMATE_API_KEY },
+      configured: { video: !!(process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY) },
       now: new Date().toISOString(),
     });
   } catch (err) { next(err); }
@@ -136,6 +136,20 @@ app.post('/pipeline/:id/approve', async (req, res, next) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// Stop a running/pending run. Agents already in flight finish, but the
+// pipeline aborts at its next checkpoint and nothing gets published.
+app.post('/pipeline/:id/cancel', async (req, res, next) => {
+  try {
+    const r = await query(
+      `UPDATE content_pipeline_runs SET status = 'cancelled', updated_at = now()
+       WHERE id = $1 AND status IN ('pending','running') RETURNING id`,
+      [req.params.id]
+    );
+    if (!r.rows.length) return res.status(400).json({ error: 'Run not found or not currently running' });
+    res.json({ id: req.params.id, status: 'cancelled' });
+  } catch (err) { next(err); }
 });
 
 // Reject a needs_review run -> mark rejected, never publishes.
