@@ -37,7 +37,7 @@ const PROVIDER_LABELS = {
   openai: 'OpenAI (images + subtitles)',
   elevenlabs: 'ElevenLabs (voiceover)',
   claude: 'Claude (scripts + captions)',
-  video: 'Video generation (HeyGen / Creatomate)',
+  video: 'Video generation (fal.ai / Veo / HeyGen / Creatomate)',
   meta: 'Meta / Instagram',
   youtube: 'YouTube',
   linkedin: 'LinkedIn',
@@ -50,7 +50,7 @@ const PROVIDER_FIX_URLS = {
   openai: 'platform.openai.com → Settings → Billing / Limits',
   elevenlabs: 'elevenlabs.io → Subscription',
   claude: 'console.anthropic.com → Billing',
-  video: 'heygen.com or creatomate.com → Billing',
+  video: 'fal.ai, aistudio.google.com, heygen.com, or creatomate.com → Billing',
   meta: 'business.facebook.com (token may have expired)',
   youtube: 'Google Cloud Console → OAuth credentials',
   linkedin: 'linkedin.com/developers (token may have expired)',
@@ -84,7 +84,7 @@ const PROVIDER_ENV = {
 
 function envNowSet(provider) {
   // Video is satisfied by EITHER provider's key.
-  if (provider === 'video') return !!(process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY);
+  if (provider === 'video') return !!(process.env.FAL_KEY || process.env.GEMINI_API_KEY || process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY);
   const vars = PROVIDER_ENV[provider];
   if (!vars) return false;
   return vars.every((v) => !!process.env[v]);

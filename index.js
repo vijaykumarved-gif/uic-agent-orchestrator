@@ -54,7 +54,11 @@ app.get('/api/live', async (req, res, next) => {
 
     res.json({
       runs: runs.rows, agents, avg_durations,
-      configured: { video: !!(process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY) },
+      configured: {
+        video: !!(process.env.FAL_KEY || process.env.GEMINI_API_KEY || process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY),
+        videoEngine: process.env.FAL_KEY ? 'fal' : process.env.GEMINI_API_KEY ? 'veo' : process.env.HEYGEN_API_KEY ? 'avatar' : process.env.CREATOMATE_API_KEY ? 'slideshow' : null,
+        veoImageSkipped: !!(process.env.FAL_KEY || process.env.GEMINI_API_KEY),
+      },
       now: new Date().toISOString(),
     });
   } catch (err) { next(err); }

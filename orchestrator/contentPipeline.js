@@ -137,7 +137,11 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel', 
     children: [
       job('caption_agent', { brand, script }, { pipelineRunId }),
       job('hashtag_agent', { brand, topic }, { pipelineRunId }),
-      job('image_agent', { brand, script, prompt: script.hook }, { pipelineRunId }),
+      // Veo generates real footage, so a reel doesn't need a still ad image.
+      // Image posts always need it.
+      ...(format === 'image' || !(process.env.FAL_KEY || process.env.GEMINI_API_KEY)
+        ? [job('image_agent', { brand, script, prompt: script.hook }, { pipelineRunId })]
+        : []),
       // Voiceover only matters for video posts — an image post doesn't need it.
       ...(format === 'reel'
         ? [job('voice_agent', { script_text: script.full_script, language }, { pipelineRunId })]
@@ -179,11 +183,13 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel', 
   // If Creatomate isn't configured at all, SKIP video rather than running the
   // agent into a guaranteed failure — a missing optional integration should
   // not force every run into needs_review. The post simply ships as an image.
-  const videoConfigured = !!(process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY);
+  const videoConfigured = !!(process.env.FAL_KEY || process.env.GEMINI_API_KEY || process.env.HEYGEN_API_KEY || process.env.CREATOMATE_API_KEY);
   if (format === 'reel' && !videoConfigured) {
     console.log('[contentPipeline] no video provider configured (HEYGEN_API_KEY / CREATOMATE_API_KEY) — publishing as image post');
   }
-  if (format === 'reel' && videoConfigured && audioUrl && imageUrls.length) {
+  // Generated-footage engines (fal.ai / Veo) don't need a still ad image.
+  const genVideoActive = !!(process.env.FAL_KEY || process.env.GEMINI_API_KEY);
+  if (format === 'reel' && videoConfigured && audioUrl && (genVideoActive || imageUrls.length)) {
     const phase3 = await flowProducer.add(
       job(
         'video_agent',
@@ -197,7 +203,7 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel', 
         { pipelineRunId }
       )
     );
-    const videoResult = await waitForJob(phase3.job, 15 * 60 * 1000); // HeyGen renders take 2-10 min
+    const videoResult = await waitForJob(phase3.job, 30 * 60 * 1000); // Veo: 3 shots + stitch; HeyGen: 2-10 min
     results.push(videoResult);
     assets[videoResult.agent] = videoResult.output;
   } else if (format === 'reel' && videoConfigured) {

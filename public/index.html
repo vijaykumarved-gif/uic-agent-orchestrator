@@ -504,6 +504,8 @@ function activeSeq(){
   const fmt = liveState && liveState.run && liveState.run.format;
   return EXPECTED_SEQ.filter(n => {
     if (fmt === 'image' && ['voice_agent','subtitle_agent','thumbnail_agent','video_agent'].includes(n)) return false;
+    // Veo generates real footage, so reels skip the still-image step entirely.
+    if (fmt === 'reel' && n === 'image_agent' && liveState && liveState.configured && liveState.configured.veoImageSkipped) return false;
     if (n === 'video_agent' && !(liveState && liveState.configured && liveState.configured.video)) return false;
     return true;
   });
