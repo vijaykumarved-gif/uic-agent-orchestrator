@@ -387,6 +387,7 @@ const AGENT_INFO = {
   subtitle_agent:         ['Subtitles',         'Generates timed captions for the video'],
   video_agent:            ['Video assembly',    'Combines image + voice + subtitles into a reel'],
   viral_prediction_agent: ['Quality score',     'Scores how well the post is likely to perform'],
+  uniqueness_check:       ['Uniqueness check',  'Makes sure this is not a repeat of a recent post'],
   instagram_publisher:    ['Instagram post',    'Publishes to Instagram'],
   facebook_publisher:     ['Facebook post',     'Publishes to Facebook'],
   youtube_shorts_publisher:['YouTube Short',    'Publishes to YouTube'],
@@ -699,7 +700,16 @@ async function openRun(id){
   const r = await fetch('/api/runs/'+id);
   if (!r.ok) return toast('Could not load that run','err');
   const d = await r.json();
-  const run=d.run, a=run.assets||{};
+  const run=d.run;
+
+  // Assets normally live on the run row, saved at the end of the creation
+  // stage. If the run crashed/stopped mid-way, that save never happened — but
+  // each agent's own output row still has the URLs. Merge them in so work that
+  // was paid for (an already-rendered video) is never invisible.
+  const a = Object.assign({}, run.assets || {});
+  (d.agents||[]).forEach(ag=>{
+    if (ag.status==='success' && ag.output && !a[ag.agent_name]) a[ag.agent_name] = ag.output;
+  });
 
   $('dtitle').textContent = run.brand.replace(/_/g,' ');
   let html = '';

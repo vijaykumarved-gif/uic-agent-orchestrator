@@ -70,4 +70,25 @@ async function completeAgentRun({ id, output, status, confidence, costUsd, durat
   );
 }
 
-module.exports = { pool, query, createPipelineRun, updatePipelineStage, logAgentRun, markAgentRunning, completeAgentRun };
+/**
+ * Recent hooks + topics for a brand (last N days) — fed to trend/script agents
+ * so they avoid repeating themselves, and used by the uniqueness check.
+ */
+async function getRecentContent(brand, days = 30, limit = 25) {
+  const res = await query(
+    `SELECT script->>'hook' AS hook,
+            trend_source->'trends'->0->>'topic' AS topic
+     FROM content_pipeline_runs
+     WHERE brand = $1
+       AND created_at > now() - ($2 || ' days')::interval
+       AND status NOT IN ('cancelled','rejected','failed')
+     ORDER BY created_at DESC
+     LIMIT $3`,
+    [brand, days, limit]
+  );
+  const hooks = res.rows.map((r) => r.hook).filter(Boolean);
+  const topics = res.rows.map((r) => r.topic).filter(Boolean);
+  return { hooks, topics };
+}
+
+module.exports = { pool, query, createPipelineRun, updatePipelineStage, logAgentRun, markAgentRunning, completeAgentRun, getRecentContent };

@@ -1,5 +1,10 @@
 const { flowProducer, queueEvents, AGENT_QUEUE_NAME } = require('./queue');
-const { createPipelineRun, updatePipelineStage, query } = require('../db/db');
+const { createPipelineRun, updatePipelineStage, query, getRecentContent, logAgentRun } = require('../db/db');
+const { closestMatch } = require('./similarity');
+
+// Above this trigram-similarity score, a new hook is considered a repeat of an
+// earlier post. Reworded-same-idea lands ~0.45-0.7; unrelated topics < 0.2.
+const DUPLICATE_THRESHOLD = 0.45;
 
 /**
  * CONTENT PIPELINE — Stages 1→2→3
@@ -36,7 +41,7 @@ function input_language(brand) {
   return process.env.VOICE_LANGUAGE || 'en';
 }
 
-async function runIntelligenceStage(pipelineRunId, { brand, region }) {
+async function runIntelligenceStage(pipelineRunId, { brand, region, recent }) {
   await updatePipelineStage(pipelineRunId, 'intelligence', 'running');
 
   const flow = await flowProducer.add({
@@ -44,7 +49,7 @@ async function runIntelligenceStage(pipelineRunId, { brand, region }) {
     queueName: AGENT_QUEUE_NAME,
     data: { input: {}, context: { pipelineRunId } },
     children: [
-      job('trend_agent', { brand, region }, { pipelineRunId }),
+      job('trend_agent', { brand, region, avoid_topics: recent.topics }, { pipelineRunId }),
       job('competitor_agent', { competitors: [] }, { pipelineRunId }), // TODO: populate per-brand competitor handles
     ],
   });
@@ -56,20 +61,59 @@ async function runIntelligenceStage(pipelineRunId, { brand, region }) {
   return { trend_source };
 }
 
-async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel' }) {
+async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel', recent }) {
   await updatePipelineStage(pipelineRunId, 'creation', 'running');
+
+  const recentHooks = recent?.hooks || [];
 
   // Script first (everything else depends on it), then fan out in parallel.
   const scriptFlow = await flowProducer.add(
-    job('script_agent', { brand, topic, format }, { pipelineRunId })
+    job('script_agent', { brand, topic, format, avoid_hooks: recentHooks }, { pipelineRunId })
   );
-  const scriptResult = await waitForJob(scriptFlow.job);
+  let scriptResult = await waitForJob(scriptFlow.job);
 
   if (scriptResult.status !== 'success' || !scriptResult.output) {
     await updatePipelineStage(pipelineRunId, 'creation', 'failed');
     throw new Error(`script_agent failed, cannot continue creation stage: ${scriptResult.error || 'no output returned'}`);
   }
-  const script = scriptResult.output;
+  let script = scriptResult.output;
+
+  // --- Uniqueness check: is this hook a repeat of recent content? ---
+  // If too similar, regenerate ONCE with the offending hook explicitly listed;
+  // if it's STILL a repeat, let it through but flag the run for human review
+  // rather than silently publishing near-duplicate content.
+  let duplicateFlag = false;
+  if (recentHooks.length) {
+    let { max, match } = closestMatch(script.hook, recentHooks);
+
+    if (max >= DUPLICATE_THRESHOLD) {
+      console.warn(`[contentPipeline] hook too similar (${max.toFixed(2)}) to: "${match}" — regenerating once`);
+      const retryFlow = await flowProducer.add(
+        job('script_agent', { brand, topic, format, avoid_hooks: [...recentHooks, script.hook] }, { pipelineRunId })
+      );
+      const retryResult = await waitForJob(retryFlow.job);
+      if (retryResult.status === 'success' && retryResult.output) {
+        script = retryResult.output;
+        ({ max, match } = closestMatch(script.hook, recentHooks));
+      }
+      duplicateFlag = max >= DUPLICATE_THRESHOLD;
+    }
+
+    // Log the check as its own step so it's visible in the dashboard timeline.
+    try {
+      await logAgentRun({
+        pipelineRunId,
+        agentName: 'uniqueness_check',
+        input: { hook: script.hook, compared_against: recentHooks.length },
+        output: { max_similarity: Number(max.toFixed(3)), closest_previous_hook: match, is_duplicate: duplicateFlag },
+        status: duplicateFlag ? 'needs_review' : 'success',
+        confidence: 1 - max,
+        costUsd: 0,
+        durationMs: 0,
+        error: duplicateFlag ? `Still ${(max * 100).toFixed(0)}% similar to a recent post after one regeneration` : null,
+      });
+    } catch (e) { console.error('[contentPipeline] uniqueness log failed:', e.message); }
+  }
 
   await query(`UPDATE content_pipeline_runs SET script = $1 WHERE id = $2`, [JSON.stringify(script), pipelineRunId]);
 
@@ -153,7 +197,7 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel' }
         { pipelineRunId }
       )
     );
-    const videoResult = await waitForJob(phase3.job);
+    const videoResult = await waitForJob(phase3.job, 15 * 60 * 1000); // HeyGen renders take 2-10 min
     results.push(videoResult);
     assets[videoResult.agent] = videoResult.output;
   } else if (format === 'reel' && videoConfigured) {
@@ -171,7 +215,8 @@ async function runCreationStage(pipelineRunId, { brand, topic, format = 'reel' }
   // caption_agent is required by every publisher downstream — if it failed,
   // don't silently publish with a missing caption; force human review instead.
   const captionMissing = !assets.caption_agent?.caption;
-  const needsReview = lowScore || captionMissing || failedAgents.length > 0;
+  // duplicateFlag: hook is still too similar to a recent post after one retry.
+  const needsReview = lowScore || captionMissing || duplicateFlag || failedAgents.length > 0;
 
   if (failedAgents.length > 0) {
     console.warn(`[contentPipeline] creation stage had ${failedAgents.length} failed agent(s):`, failedAgents);
@@ -234,7 +279,7 @@ async function runDistributionStage(pipelineRunId, { brand, script, assets, plat
     children,
   });
 
-  const results = await waitForFlowChildren(flow.job);
+  const results = await waitForFlowChildren(flow.job, 12 * 60 * 1000); // IG processes reels for several minutes
 
   for (const r of results) {
     if (r.status === 'success') {
@@ -261,7 +306,32 @@ async function runDistributionStage(pipelineRunId, { brand, script, assets, plat
 async function runContentPipeline({ brand, topic, region = 'Ahmedabad', platforms = ['instagram'], format = 'reel' }) {
   const pipelineRunId = await createPipelineRun({ brand, platformsTargeted: platforms, format });
 
-  const { trend_source } = await runIntelligenceStage(pipelineRunId, { brand, region });
+  try {
+    return await runPipelineInner(pipelineRunId, { brand, topic, region, platforms, format });
+  } catch (err) {
+    // Never leave a crashed run stuck as "Running" forever in the dashboard —
+    // mark it failed so the UI reflects reality and the user can re-run.
+    try {
+      const cur = await query(`SELECT status FROM content_pipeline_runs WHERE id = $1`, [pipelineRunId]);
+      if (['pending', 'running'].includes(cur.rows[0]?.status)) {
+        await query(
+          `UPDATE content_pipeline_runs SET status = 'failed', updated_at = now() WHERE id = $1`,
+          [pipelineRunId]
+        );
+      }
+    } catch (e) { console.error('[contentPipeline] failed to mark run failed:', e.message); }
+    throw err;
+  }
+}
+
+async function runPipelineInner(pipelineRunId, { brand, topic, region, platforms, format }) {
+
+  // What has this brand already posted recently? Used to steer trend/script
+  // away from repeats, and by the uniqueness check afterwards.
+  let recent = { hooks: [], topics: [] };
+  try { recent = await getRecentContent(brand); } catch (e) { console.error('[contentPipeline] recent-content fetch failed:', e.message); }
+
+  const { trend_source } = await runIntelligenceStage(pipelineRunId, { brand, region, recent });
 
   if (await isCancelled(pipelineRunId)) return { pipelineRunId, status: 'cancelled' };
 
@@ -269,6 +339,7 @@ async function runContentPipeline({ brand, topic, region = 'Ahmedabad', platform
     brand,
     topic: topic || trend_source?.trends?.[0]?.topic || 'general health awareness',
     format,
+    recent,
   });
 
   if (await isCancelled(pipelineRunId)) return { pipelineRunId, status: 'cancelled' };
@@ -290,7 +361,11 @@ async function runContentPipeline({ brand, topic, region = 'Ahmedabad', platform
 // job.waitUntilFinished(queueEvents) is the correct BullMQ API for a
 // producer to await completion; it subscribes to the queue's event stream.
 
-async function waitForJob(bullJob, timeoutMs = 120000) {
+// Default waits sized for real media work: image gen ~80s, thumbnail ~60s,
+// subtitles ~60s. Video (HeyGen avatar render: 2-10 min) and distribution
+// (Instagram processes reel containers for several minutes) pass explicit
+// larger timeouts below.
+async function waitForJob(bullJob, timeoutMs = 300000) {
   try {
     const result = await bullJob.waitUntilFinished(queueEvents, timeoutMs);
     return result;
@@ -299,7 +374,7 @@ async function waitForJob(bullJob, timeoutMs = 120000) {
   }
 }
 
-async function waitForFlowChildren(parentBullJob, timeoutMs = 180000) {
+async function waitForFlowChildren(parentBullJob, timeoutMs = 420000) {
   // Wait for the parent (which BullMQ holds in "waiting-children" until every
   // child completes) — then read back each child's return value.
   await waitForJob(parentBullJob, timeoutMs);

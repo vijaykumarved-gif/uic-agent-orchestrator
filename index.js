@@ -111,7 +111,7 @@ app.get('/api/runs/:id', async (req, res, next) => {
     if (!run.rows.length) return res.status(404).json({ error: 'Run not found' });
 
     const agents = await query(
-      `SELECT agent_name, status, confidence, cost_usd, duration_ms, error, created_at
+      `SELECT agent_name, status, output, confidence, cost_usd, duration_ms, error, created_at
        FROM agent_runs WHERE pipeline_run_id = $1 ORDER BY created_at`,
       [req.params.id]
     );
