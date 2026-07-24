@@ -216,7 +216,7 @@ const GENAI = 'https://generativelanguage.googleapis.com/v1beta';
 async function veoVideo({ script, brand, audio_url, captions = [] }, { hasCreatomate }) {
   const key = process.env.GEMINI_API_KEY;
   // NOTE: the veo-3.0-* model IDs were shut down on 2026-06-30 — 3.1 only.
-  const model = process.env.VEO_MODEL || 'veo-3.1-fast-generate-preview';
+  const model = process.env.VEO_MODEL || 'veo-3.1-lite-generate-preview';
   const resolution = process.env.VEO_RESOLUTION || '720p';
   const maxScenes = hasCreatomate ? Math.max(1, parseInt(process.env.VEO_SCENES || '3', 10)) : 1;
 
@@ -265,21 +265,38 @@ function estimateVeoCost(shots, model) {
 }
 
 async function generateVeoClip({ prompt, model, resolution, key, brand }) {
-  const startRes = await fetch(`${GENAI}/models/${model}:predictLongRunning`, {
-    method: 'POST',
-    headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      instances: [{ prompt }],
-      parameters: {
-        aspectRatio: '9:16',        // vertical for reels
-        resolution,
-        personGeneration: 'allow_adult',
-        negativePrompt: 'text overlays, watermarks, logos, subtitles, distorted anatomy, extra fingers, medical gore',
-      },
-    }),
+  const body = JSON.stringify({
+    instances: [{ prompt }],
+    parameters: {
+      aspectRatio: '9:16',        // vertical for reels
+      resolution,
+      personGeneration: 'allow_adult',
+      negativePrompt: 'text overlays, watermarks, logos, subtitles, distorted anatomy, extra fingers, medical gore',
+    },
   });
+  const call = (m) =>
+    fetch(`${GENAI}/models/${m}:predictLongRunning`, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
+      body,
+    });
 
-  if (!startRes.ok) {
+  let startRes = await call(model);
+
+  // Google renames/retires Veo model IDs fairly often (the veo-3.0-* IDs were
+  // removed in June 2026). Rather than dying on a stale env value, ask the API
+  // which Veo models this key can actually use and retry with one of those.
+  if (!startRes.ok && [404, 400].includes(startRes.status)) {
+    const errText = await startRes.text();
+    if (/not found|not supported|invalid.*model/i.test(errText)) {
+      const discovered = await discoverVeoModel(key, model);
+      if (discovered) {
+        console.warn(`[video_agent] Veo model "${model}" unavailable — using "${discovered}" instead`);
+        startRes = await call(discovered);
+      }
+    }
+    if (!startRes.ok) throw new Error(`Veo start error (${startRes.status}): ${errText.slice(0, 250)}`);
+  } else if (!startRes.ok) {
     throw new Error(`Veo start error (${startRes.status}): ${(await startRes.text()).slice(0, 250)}`);
   }
 
@@ -323,6 +340,34 @@ async function pollVeo(operationName, key, timeoutMs = 300000, intervalMs = 1000
     return uri;
   }
   throw new Error('Veo clip generation timed out after 5 minutes');
+}
+
+/**
+ * Ask the Gemini API which Veo models this key can use, preferring the same
+ * tier the user configured (lite -> lite, fast -> fast) so a rename doesn't
+ * silently upgrade them onto a much more expensive model.
+ */
+async function discoverVeoModel(key, preferred = '') {
+  try {
+    const res = await fetch(`${GENAI}/models`, { headers: { 'x-goog-api-key': key } });
+    if (!res.ok) return null;
+    const list = (await res.json()).models || [];
+    const veo = list
+      .map((m) => (m.name || '').replace(/^models\//, ''))
+      .filter((n) => /^veo-/i.test(n));
+    if (!veo.length) return null;
+
+    const tier = /lite/i.test(preferred) ? 'lite' : /fast/i.test(preferred) ? 'fast' : null;
+    if (tier) {
+      const sameTier = veo.find((n) => n.includes(tier));
+      if (sameTier) return sameTier;
+      // Don't silently jump to a pricier tier — surface it instead.
+      console.warn(`[video_agent] no "${tier}" Veo model available; candidates: ${veo.join(', ')}`);
+    }
+    return veo[0];
+  } catch {
+    return null;
+  }
 }
 
 /** Concatenate clips and lay our voiceover + auto subtitles over the top. */
